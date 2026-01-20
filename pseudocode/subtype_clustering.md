@@ -121,6 +121,9 @@ function reduce_dimensions(X, method="pca"):
 function pca_reduction(X):
     """
     PCA with automatic component selection.
+
+    Selects the minimum number of components needed to explain
+    VARIANCE_THRESHOLD (default 90%) of the total variance.
     """
     # Fit PCA
     pca = PCA()
@@ -128,8 +131,18 @@ function pca_reduction(X):
 
     # Select components explaining VARIANCE_THRESHOLD of variance
     cumulative_var = cumsum(pca.explained_variance_ratio_)
-    n_components = argmax(cumulative_var >= VARIANCE_THRESHOLD) + 1
+
+    # Find first index where cumulative variance exceeds threshold
+    # np.where returns indices where condition is True; take first one
+    indices_above_threshold = where(cumulative_var >= VARIANCE_THRESHOLD)[0]
+
+    if len(indices_above_threshold) > 0:
+        n_components = indices_above_threshold[0] + 1  # +1 because indices are 0-based
+    else:
+        n_components = len(cumulative_var)  # Use all components if threshold not reached
+
     n_components = min(n_components, MAX_DIMENSIONS)
+    n_components = max(n_components, 1)  # At least 1 component
 
     # Transform
     X_reduced = pca.transform(X)[:, :n_components]

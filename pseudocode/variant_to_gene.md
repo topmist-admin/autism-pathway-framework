@@ -2,7 +2,7 @@
 
 ## Overview
 
-This module transforms raw genetic variants into gene-level burden scores for each individual.
+This module transforms raw genetic variants into gene-level burden scores for each individual. It supports multiple weighting schemes including consequence-based, pathogenicity score-based (CADD, REVEL), and allele frequency-based weighting.
 
 ---
 
@@ -16,9 +16,10 @@ variants: List of annotated variants per individual
   - ref: string
   - alt: string
   - gene: string
-  - consequence: string (e.g., "missense", "frameshift", "synonymous")
-  - af_population: float (allele frequency in reference population)
-  - impact_score: float (predicted functional impact, e.g., CADD)
+  - consequence: string (e.g., "missense_variant", "frameshift_variant", "synonymous_variant")
+  - gnomad_af: float (allele frequency in gnomAD population)
+  - cadd_phred: float (CADD phred-scaled score, higher = more deleterious)
+  - revel_score: float (REVEL score for missense variants, 0-1 scale)
   - quality_metrics: {dp, gq, filter_status}
 ```
 
@@ -34,31 +35,56 @@ gene_burdens: Map[sample_id → Map[gene_id → burden_score]]
 
 ```python
 # Consequence weights (higher = more damaging)
+# These map to VEP/Ensembl consequence terms
 CONSEQUENCE_WEIGHTS = {
-    "frameshift": 1.0,
+    # Loss-of-function (highest weight)
+    "frameshift_variant": 1.0,
     "stop_gained": 1.0,
-    "splice_donor": 1.0,
-    "splice_acceptor": 1.0,
-    "start_lost": 0.9,
-    "stop_lost": 0.9,
-    "missense_damaging": 0.7,  # Based on impact predictor
-    "missense_benign": 0.2,
-    "inframe_indel": 0.5,
-    "synonymous": 0.0,
-    "intronic": 0.0,
-    "intergenic": 0.0,
+    "splice_donor_variant": 1.0,
+    "splice_acceptor_variant": 1.0,
+    "start_lost": 1.0,
+
+    # Moderate impact
+    "missense_variant": 0.5,          # Base weight, may be adjusted by CADD/REVEL
+    "inframe_insertion": 0.3,
+    "inframe_deletion": 0.3,
+    "protein_altering_variant": 0.5,
+
+    # Low impact
+    "splice_region_variant": 0.2,
+    "synonymous_variant": 0.0,
+
+    # Modifier (usually excluded)
+    "5_prime_UTR_variant": 0.1,
+    "3_prime_UTR_variant": 0.1,
+    "intron_variant": 0.0,
+    "intergenic_variant": 0.0,
 }
 
 # Allele frequency thresholds
 AF_ULTRA_RARE = 0.0001   # < 0.01%
-AF_RARE = 0.01           # < 1%
+AF_RARE = 0.001          # < 0.1%
+AF_MAX = 0.01            # < 1% (exclude common variants)
 
 # Quality thresholds
 MIN_DEPTH = 10
 MIN_GQ = 20
 
-# Impact score threshold for "damaging" missense
-DAMAGING_THRESHOLD = 20  # e.g., CADD >= 20
+# CADD score configuration
+USE_CADD_WEIGHTING = True
+CADD_THRESHOLD = 20.0        # Minimum CADD phred to include missense
+CADD_WEIGHT_SCALE = 0.05     # Weight = CADD_phred * scale (e.g., CADD=30 -> 1.5)
+
+# REVEL score configuration (for missense variants)
+USE_REVEL_WEIGHTING = True
+REVEL_THRESHOLD = 0.5        # Minimum REVEL score to consider damaging
+
+# Allele frequency weighting
+USE_AF_WEIGHTING = False     # If True, weight by rarity
+AF_WEIGHT_BETA = 1.0         # Weight = (1 - AF)^beta
+
+# Aggregation method
+AGGREGATION_METHOD = "weighted_sum"  # Options: "weighted_sum", "max", "count"
 ```
 
 ---
@@ -98,18 +124,14 @@ function filter_variants(variants):
 function classify_impact(variant):
     """
     Determine the functional impact category for a variant.
-    Returns a weight reflecting predicted deleteriousness.
+    Returns a base weight reflecting predicted deleteriousness.
+
+    For missense variants, the base weight may be overridden
+    by CADD or REVEL scores in the compute_weight function.
     """
     consequence = variant.consequence
 
-    # Handle missense variants specially
-    if consequence == "missense":
-        if variant.impact_score >= DAMAGING_THRESHOLD:
-            return CONSEQUENCE_WEIGHTS["missense_damaging"]
-        else:
-            return CONSEQUENCE_WEIGHTS["missense_benign"]
-
-    # Look up weight for other consequences
+    # Look up weight for consequence type
     if consequence in CONSEQUENCE_WEIGHTS:
         return CONSEQUENCE_WEIGHTS[consequence]
 
@@ -117,22 +139,75 @@ function classify_impact(variant):
     return 0.0
 ```
 
-### Step 3: Apply Rarity Weighting
+### Step 3: Compute Variant Weight (Enhanced)
 
 ```python
-function rarity_weight(af):
+function compute_weight(variant):
     """
-    Weight variants by rarity. Rarer variants get higher weight.
+    Compute the final weight for a variant, incorporating:
+    1. Base consequence weight
+    2. CADD score weighting (for missense)
+    3. REVEL score weighting (for missense)
+    4. Allele frequency weighting (optional)
+
+    This provides more nuanced weighting than simple consequence categories.
     """
-    if af < AF_ULTRA_RARE:
-        return 1.0  # Ultra-rare: full weight
-    elif af < AF_RARE:
-        return 0.5  # Rare: half weight
-    else:
-        return 0.0  # Common: exclude
+    # Start with base consequence weight
+    weight = classify_impact(variant)
+
+    # For missense variants, apply pathogenicity score weighting
+    if variant.consequence == "missense_variant":
+
+        # CADD-based weighting: use CADD phred score directly
+        if USE_CADD_WEIGHTING and variant.cadd_phred is not None:
+            # Filter out missense below CADD threshold
+            if variant.cadd_phred < CADD_THRESHOLD:
+                return 0.0  # Exclude low-impact missense
+
+            # Scale CADD score to weight
+            # Example: CADD=30 with scale=0.05 -> weight=1.5
+            weight = variant.cadd_phred * CADD_WEIGHT_SCALE
+
+        # REVEL-based weighting: ensemble predictor for missense
+        if USE_REVEL_WEIGHTING and variant.revel_score is not None:
+            if variant.revel_score >= REVEL_THRESHOLD:
+                # Use REVEL score directly if above threshold
+                # Take maximum of CADD-derived and REVEL weight
+                weight = max(weight, variant.revel_score)
+
+    # Allele frequency weighting (optional)
+    # Upweights rare variants, downweights common variants
+    if USE_AF_WEIGHTING and variant.gnomad_af is not None:
+        # Weight = (1 - AF)^beta
+        # For beta=1: AF=0.01 -> 0.99, AF=0.001 -> 0.999
+        af_weight = (1.0 - variant.gnomad_af) ** AF_WEIGHT_BETA
+        weight *= af_weight
+
+    return max(0.0, weight)
 ```
 
-### Step 4: Compute Gene Burden
+### Step 4: Apply Rarity Filtering
+
+```python
+function passes_rarity_filter(variant):
+    """
+    Check if variant passes allele frequency filters.
+    We typically only consider rare variants for burden analysis.
+    """
+    af = variant.gnomad_af
+
+    # If no AF data, assume rare (could be novel variant)
+    if af is None:
+        return True
+
+    # Exclude common variants
+    if af >= AF_MAX:
+        return False
+
+    return True
+```
+
+### Step 5: Compute Gene Burden
 
 ```python
 function compute_gene_burden(variants_for_sample):
@@ -141,8 +216,14 @@ function compute_gene_burden(variants_for_sample):
 
     Input: List of variants for a single sample
     Output: Map[gene_id → burden_score]
+
+    Supports multiple aggregation methods:
+    - weighted_sum: Sum of all variant weights (default)
+    - max: Maximum variant weight per gene
+    - count: Simple count of qualifying variants
     """
     gene_scores = defaultdict(float)
+    gene_variant_counts = defaultdict(int)
 
     for variant in variants_for_sample:
         gene = variant.gene
@@ -150,20 +231,30 @@ function compute_gene_burden(variants_for_sample):
         if gene is None or gene == "":
             continue  # Skip intergenic variants
 
-        # Compute variant weight
-        impact_weight = classify_impact(variant)
-        rarity = rarity_weight(variant.af_population)
+        # Check rarity filter
+        if not passes_rarity_filter(variant):
+            continue
 
-        # Combined weight
-        variant_weight = impact_weight * rarity
+        # Compute variant weight using enhanced method
+        variant_weight = compute_weight(variant)
 
-        # Aggregate to gene (additive model)
-        gene_scores[gene] += variant_weight
+        if variant_weight <= 0:
+            continue
+
+        # Aggregate to gene based on configured method
+        if AGGREGATION_METHOD == "weighted_sum":
+            gene_scores[gene] += variant_weight
+        elif AGGREGATION_METHOD == "max":
+            gene_scores[gene] = max(gene_scores[gene], variant_weight)
+        elif AGGREGATION_METHOD == "count":
+            gene_scores[gene] += 1
+
+        gene_variant_counts[gene] += 1
 
     return gene_scores
 ```
 
-### Step 5: Process All Samples
+### Step 6: Process All Samples
 
 ```python
 function compute_all_gene_burdens(all_variants):

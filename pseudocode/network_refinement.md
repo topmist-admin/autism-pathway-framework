@@ -142,33 +142,73 @@ function build_transition_matrix(G, apply_hub_correction=True):
 ```python
 function random_walk_with_restart(initial_scores, W, alpha, max_iter, tol):
     """
-    Propagate scores through network using Random Walk with Restart.
+    Propagate scores through network using Random Walk with Restart (RWR).
 
-    p(t+1) = (1 - α) * W * p(t) + α * p(0)
+    The iterative update formula is:
+        p(t+1) = (1 - α) × W × p(t) + α × p(0)
+
+    Where:
+        - p(t) is the score vector at iteration t
+        - W is the row-normalized transition matrix
+        - α (alpha) is the restart probability
+        - p(0) is the initial/seed score vector
+
+    Intuition:
+        At each step, with probability (1-α) we take a random walk step
+        along network edges, and with probability α we "restart" back to
+        the initial scores. Higher α means staying closer to original scores;
+        lower α means more network smoothing.
 
     Args:
         initial_scores: Vector of initial gene scores (p0)
-        W: Transition matrix
-        alpha: Restart probability (higher = stay closer to initial)
-        max_iter: Maximum iterations
-        tol: Convergence tolerance
+            - Should be normalized (sum to 1) for interpretability
+            - Genes not in the initial set have score 0
+        W: Row-normalized transition matrix (from build_transition_matrix)
+            - W[i,j] = probability of walking from gene i to gene j
+            - Each row sums to 1
+        alpha: Restart probability (typically 0.3-0.7)
+            - Higher alpha = more fidelity to original scores
+            - Lower alpha = more network propagation
+        max_iter: Maximum iterations (typically 100-500)
+        tol: Convergence tolerance (typically 1e-6 to 1e-8)
+            - Algorithm stops when ||p(t+1) - p(t)|| < tol
 
     Returns:
-        Propagated score vector
+        Propagated score vector (converged or max_iter reached)
+
+    Notes:
+        - Convergence is guaranteed for 0 < alpha < 1 and valid W
+        - Typical convergence in 20-50 iterations
+        - Result is a probability distribution over genes
     """
+    # Validate inputs
+    if alpha <= 0 or alpha >= 1:
+        raise ValueError("alpha must be in (0, 1)")
+
     p0 = initial_scores.copy()
     p = p0.copy()
 
+    # Track convergence for diagnostics
+    converged = False
+    final_iteration = max_iter
+
     for iteration in range(max_iter):
-        # One step of random walk
+        # One step of random walk with restart
+        # p_new = (1 - α) × W × p + α × p0
         p_new = (1 - alpha) * (W @ p) + alpha * p0
 
-        # Check convergence
+        # Check convergence using L2 norm of change
         diff = norm(p_new - p)
         if diff < tol:
+            converged = True
+            final_iteration = iteration + 1
             break
 
         p = p_new
+
+    # Log convergence status
+    if not converged:
+        log_warning(f"RWR did not converge in {max_iter} iterations (diff={diff:.2e})")
 
     return p
 ```
@@ -179,19 +219,56 @@ function random_walk_with_restart(initial_scores, W, alpha, max_iter, tol):
 function propagate_sample_scores(gene_scores_for_sample, W, nodes, node_to_idx):
     """
     Apply network propagation to one sample's gene scores.
+
+    Handles several preprocessing steps:
+    1. Maps gene names to matrix indices
+    2. Handles genes not present in the network (skipped)
+    3. Normalizes initial scores to sum to 1
+    4. Runs RWR propagation
+    5. Converts back to gene-score dictionary
+
+    Args:
+        gene_scores_for_sample: Dict mapping gene_id -> burden score
+        W: Row-normalized transition matrix
+        nodes: List of gene names in matrix order
+        node_to_idx: Dict mapping gene_id -> matrix index
+
+    Returns:
+        Dict mapping gene_id -> propagated score
     """
     n = len(nodes)
 
     # Build initial score vector
+    # Only genes present in the network are included
     p0 = zeros(n)
+    genes_mapped = 0
+    genes_unmapped = []
+
     for gene, score in gene_scores_for_sample.items():
         if gene in node_to_idx:
             idx = node_to_idx[gene]
             p0[idx] = score
+            genes_mapped += 1
+        else:
+            # Gene not in network - track for diagnostics
+            genes_unmapped.append(gene)
 
-    # Normalize initial scores (optional but recommended)
-    if p0.sum() > 0:
-        p0 = p0 / p0.sum()
+    # Handle edge case: no genes mapped to network
+    if genes_mapped == 0:
+        log_warning("No genes from sample mapped to network")
+        return {}
+
+    # Log unmapped genes if significant fraction
+    if len(genes_unmapped) > 0.2 * len(gene_scores_for_sample):
+        log_warning(f"{len(genes_unmapped)} genes not in network (out of {len(gene_scores_for_sample)})")
+
+    # Normalize initial scores to sum to 1
+    # This makes the propagated scores interpretable as probabilities
+    total = p0.sum()
+    if total > 0:
+        p0 = p0 / total
+    else:
+        return {}
 
     # Run propagation
     p_final = random_walk_with_restart(
@@ -202,6 +279,7 @@ function propagate_sample_scores(gene_scores_for_sample, W, nodes, node_to_idx):
     )
 
     # Convert back to gene-score map
+    # Only include genes with non-zero propagated scores
     propagated_scores = {}
     for i, gene in enumerate(nodes):
         if p_final[i] > 0:

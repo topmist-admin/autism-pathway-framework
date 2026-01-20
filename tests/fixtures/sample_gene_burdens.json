@@ -1,0 +1,48 @@
+{
+  "SAMPLE_001": {
+    "SHANK3": {
+      "burden_score": 1.5,
+      "variant_count": 2,
+      "contributing_variants": ["chr22:51135990:G>A", "chr22:51140231:C>T"]
+    },
+    "NRXN1": {
+      "burden_score": 1.0,
+      "variant_count": 1,
+      "contributing_variants": ["chr2:50145678:A>G"]
+    },
+    "CHD8": {
+      "burden_score": 0.5,
+      "variant_count": 1,
+      "contributing_variants": ["chr14:21853912:T>C"]
+    }
+  },
+  "SAMPLE_002": {
+    "SYNGAP1": {
+      "burden_score": 1.0,
+      "variant_count": 1,
+      "contributing_variants": ["chr6:33395336:G>A"]
+    },
+    "GRIN2B": {
+      "burden_score": 0.8,
+      "variant_count": 1,
+      "contributing_variants": ["chr12:13713931:C>T"]
+    }
+  },
+  "SAMPLE_003": {
+    "ARID1B": {
+      "burden_score": 1.0,
+      "variant_count": 1,
+      "contributing_variants": ["chr6:157099062:A>G"]
+    },
+    "SCN2A": {
+      "burden_score": 1.2,
+      "variant_count": 2,
+      "contributing_variants": ["chr2:166166916:G>A", "chr2:166184104:T>C"]
+    },
+    "SHANK3": {
+      "burden_score": 0.6,
+      "variant_count": 1,
+      "contributing_variants": ["chr22:51140231:C>T"]
+    }
+  }
+}

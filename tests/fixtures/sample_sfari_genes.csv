@@ -1,0 +1,19 @@
+gene-symbol,gene-name,gene-score,syndromic,chromosome
+SHANK3,SH3 and multiple ankyrin repeat domains 3,1,1,22
+CHD8,Chromodomain helicase DNA binding protein 8,1,0,14
+ADNP,Activity dependent neuroprotector homeobox,1,1,20
+SYNGAP1,Synaptic Ras GTPase activating protein 1,1,0,6
+ARID1B,AT-rich interaction domain 1B,1,1,6
+SCN2A,Sodium voltage-gated channel alpha subunit 2,1,0,2
+DYRK1A,Dual specificity tyrosine phosphorylation regulated kinase 1A,1,1,21
+ANK2,Ankyrin 2,1,0,4
+NRXN1,Neurexin 1,2,0,2
+GRIN2B,Glutamate ionotropic receptor NMDA type subunit 2B,2,0,12
+PTEN,Phosphatase and tensin homolog,2,1,10
+TBR1,T-box brain transcription factor 1,2,0,2
+FOXP1,Forkhead box P1,2,1,3
+CNTNAP2,Contactin associated protein 2,2,0,7
+SETD5,SET domain containing 5,2,0,3
+KMT2C,Lysine methyltransferase 2C,3,0,7
+POGZ,Pogo transposable element derived with ZNF domain,3,0,1
+ASH1L,ASH1 like histone lysine methyltransferase,3,0,1

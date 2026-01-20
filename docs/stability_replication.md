@@ -31,9 +31,9 @@ Stability testing and replication protect against false discoveries and overinte
    - Key associations
 
 **Metrics**:
-- Bootstrap confidence intervals for pathway scores
-- Cluster stability (proportion of times pairs co-cluster)
-- Rank correlation of pathway importance across bootstraps
+- Bootstrap confidence intervals for pathway scores (95% CI)
+- Cluster stability: proportion of times pairs co-cluster (threshold: ≥0.80 for stable clusters)
+- Rank correlation of pathway importance across bootstraps (Spearman ρ ≥ 0.70 indicates stability)
 
 ### 2. Subsample Stability
 
@@ -57,7 +57,10 @@ Stability testing and replication protect against false discoveries and overinte
    - Number of clusters K
 2. Assess stability of main conclusions
 
-**Stable results** should be robust to modest parameter changes.
+**Stable results**: Key findings should persist when parameters vary by ±20% from defaults. Specifically:
+- Variant weighting: α ± 0.2 should not change top-10 pathway rankings
+- Network propagation: α ± 0.1 should maintain >80% overlap in enriched genes
+- Cluster number K: results should be interpretable for K ± 1
 
 ### 4. Initialization Sensitivity
 
@@ -78,8 +81,8 @@ Replication is assessed at the **pathway and subtype level**, not by exact gene 
 |-------|-------------|
 | Individual variants | Will differ |
 | Specific genes | May differ |
-| Pathway enrichments | Should be directionally consistent |
-| Subtype structure | Should show similar patterns |
+| Pathway enrichments | Should be directionally consistent (Spearman ρ ≥ 0.60) |
+| Subtype structure | Should show similar patterns (ARI ≥ 0.50, Jaccard ≥ 0.40) |
 
 ### Replication Procedure
 
@@ -91,21 +94,22 @@ Replication is assessed at the **pathway and subtype level**, not by exact gene 
 ### What to Compare
 
 **Pathway-level**:
-- Rank correlation of pathway disruption scores
-- Overlap of top-K pathways
-- Directional consistency (same pathways enriched/depleted)
+- Rank correlation of pathway disruption scores (Spearman ρ ≥ 0.60 for strong replication)
+- Overlap of top-K pathways (Jaccard index ≥ 0.50 for top-20 pathways)
+- Directional consistency: ≥75% of significantly disrupted pathways show same direction of effect
 
 **Subtype-level**:
-- Similar number and relative size of clusters
-- Consistent pathway signatures per subtype
-- Comparable phenotype associations (if available)
+- Similar number of clusters (±1 cluster tolerance)
+- Relative size consistency: largest cluster size differs by <15% between cohorts
+- Consistent pathway signatures per subtype (cosine similarity ≥ 0.70)
+- Comparable phenotype associations (if available): correlation r ≥ 0.50
 
 ### Partial Replication
 
 Full replication is rare. Consider:
-- **Directional consistency**: Same direction of effect
-- **Biological coherence**: Same biological themes even if specific pathways differ
-- **Effect size attenuation**: Smaller effects in replication (expected due to winner's curse)
+- **Directional consistency**: Same direction of effect (≥70% agreement on top pathways)
+- **Biological coherence**: Same biological themes even if specific pathways differ (semantic similarity ≥ 0.60 using GO hierarchy)
+- **Effect size attenuation**: Smaller effects in replication (expected 20-40% attenuation due to winner's curse)
 
 ---
 
@@ -222,6 +226,24 @@ Full replication is rare. Consider:
 - [ ] Effect sizes reported (not just p-values)
 - [ ] Multiple testing correction applied
 - [ ] Limitations explicitly stated
+
+---
+
+## Quantitative Thresholds Summary
+
+| Metric | Threshold | Interpretation |
+|--------|-----------|----------------|
+| Cluster stability (co-clustering) | ≥ 0.80 | Pair of samples clusters together ≥80% of bootstraps |
+| Rank correlation (pathways) | Spearman ρ ≥ 0.70 | Stable pathway importance across bootstraps |
+| Cross-cohort pathway correlation | Spearman ρ ≥ 0.60 | Strong replication of pathway scores |
+| Top-K pathway Jaccard | ≥ 0.50 | At least half of top-20 pathways overlap |
+| Directional consistency | ≥ 75% | Same enrichment direction in replication |
+| Adjusted Rand Index (ARI) | ≥ 0.50 | Moderate cluster agreement across cohorts |
+| Subtype Jaccard overlap | ≥ 0.40 | Acceptable sample assignment agreement |
+| Pathway signature similarity | Cosine ≥ 0.70 | Similar subtype pathway profiles |
+| Phenotype correlation | r ≥ 0.50 | Comparable clinical associations |
+| Effect size attenuation | 20-40% | Expected reduction in replication cohort |
+| Parameter sensitivity | ±20% | Results stable within this range |
 
 ---
 

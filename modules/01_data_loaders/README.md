@@ -27,20 +27,35 @@ anndata>=0.8.0  # For single-cell data (h5ad format)
 ```python
 @dataclass
 class Variant:
-    chrom: str
-    pos: int
-    ref: str
-    alt: str
-    sample_id: str
-    genotype: str
-    quality: float
-    info: Dict[str, Any]
+    """Single genetic variant for one sample."""
+    chrom: str              # Chromosome (e.g., "chr1", "1")
+    pos: int                # 1-based position
+    ref: str                # Reference allele
+    alt: str                # Alternate allele
+    sample_id: str          # Sample identifier
+    genotype: str           # Genotype call (e.g., "0/1", "1/1")
+    quality: float          # Variant quality score (QUAL)
+    filter_status: str      # Filter status ("PASS" or filter name)
+    info: Dict[str, Any]    # INFO field key-value pairs
+    variant_id: Optional[str] = None  # Variant ID (rsID)
+
+    # Computed properties
+    @property
+    def variant_type(self) -> str:
+        """Determine variant type: SNV, insertion, deletion, MNV"""
+        ...
+
+    @property
+    def is_snv(self) -> bool:
+        """Check if single nucleotide variant"""
+        ...
 
 @dataclass
 class VariantDataset:
-    variants: List[Variant]
-    samples: List[str]
-    metadata: Dict[str, Any]
+    """Collection of variants with associated sample information."""
+    variants: List[Variant]     # All variants in the dataset
+    samples: List[str]          # Unique sample identifiers
+    metadata: Dict[str, Any]    # Dataset metadata (source, date, etc.)
 
 @dataclass
 class PathwayDatabase:

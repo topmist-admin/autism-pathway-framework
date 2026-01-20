@@ -1,5 +1,22 @@
 # Framework Overview
 
+## Implementation Status
+
+| Phase | Description | Status | Modules |
+|-------|-------------|--------|---------|
+| 1A | Data Foundation | ✅ Complete | 01 Data Loaders |
+| 1B | Variant Processing | ✅ Complete | 02 Variant Processing |
+| 2A | Pathway Scoring | 🔲 Not Started | 03 Pathway Scoring |
+| 2B | Network Integration | 🔲 Not Started | 04 Network Integration |
+| 3A | Biological Context | 🔲 Not Started | 05 Context Integration |
+| 3B | Subtype Discovery | 🔲 Not Started | 06 Clustering |
+| 4 | Reasoning Layer | 🔲 Not Started | 07-09 Reasoning, Causal, Reports |
+| 5 | Validation | 🔲 Not Started | 10-12 Validation, Testing |
+
+> See [Implementation Plan](implementation_plan.md) for detailed module status and development roadmap.
+
+---
+
 ## Introduction
 
 This document provides a conceptual overview of the pathway- and network-based framework for analyzing genetic heterogeneity in Autism Spectrum Disorder (ASD).

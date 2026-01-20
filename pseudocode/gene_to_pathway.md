@@ -86,19 +86,43 @@ function compute_raw_pathway_score(gene_burdens_for_sample, pathway_genes, gene_
 
     Input:
         gene_burdens_for_sample: Map[gene_id → burden]
+            - Keys are gene identifiers (e.g., HGNC symbols or Ensembl IDs)
+            - Values are burden scores (typically >= 0)
+            - Missing genes are treated as burden = 0
         pathway_genes: Set[gene_id] in pathway
+            - Set of gene identifiers that belong to this pathway
         gene_weights: Optional Map[gene_id → weight]
+            - Optional per-gene importance weights (e.g., from constraint scores)
+            - If None, all genes weighted equally (weight = 1.0)
 
     Output:
-        raw_score: float
-        contributing_genes: List of (gene, contribution) tuples
+        raw_score: float - Sum of weighted gene contributions
+        contributing_genes: List of (gene, contribution) tuples, sorted by contribution
+
+    Edge Cases Handled:
+        - Empty pathway_genes: Returns (0.0, [])
+        - No genes with burden > 0: Returns (0.0, [])
+        - Gene in pathway but not in gene_burdens: Treated as burden = 0
+        - Gene in pathway but not in gene_weights: Uses default weight = 1.0
+        - All contributions are 0: Returns (0.0, [])
+
+    Note on genes_with_data counting:
+        - A gene "has data" if its burden > 0 in gene_burdens_for_sample
+        - Genes with burden = 0 are NOT counted (absence of variants)
+        - This differs from genes not present in gene_burdens (unknown/no coverage)
     """
+    # Handle empty pathway
+    if not pathway_genes:
+        return 0.0, []
+
     total_score = 0.0
     contributions = []
 
     for gene in pathway_genes:
         burden = gene_burdens_for_sample.get(gene, 0.0)
 
+        # Skip genes with no burden
+        # Note: burden = 0 means no qualifying variants, not "unknown"
         if burden == 0:
             continue
 
@@ -111,6 +135,8 @@ function compute_raw_pathway_score(gene_burdens_for_sample, pathway_genes, gene_
         contribution = burden * weight
         total_score += contribution
 
+        # Only include genes with positive contribution in the list
+        # This avoids cluttering output with zero-contribution genes
         if contribution > 0:
             contributions.append({
                 "gene_id": gene,
@@ -119,7 +145,8 @@ function compute_raw_pathway_score(gene_burdens_for_sample, pathway_genes, gene_
                 "contribution": contribution
             })
 
-    # Sort by contribution (descending)
+    # Sort by contribution (descending) for interpretability
+    # Top contributors are most informative for understanding pathway scores
     contributions.sort(key=lambda x: x["contribution"], reverse=True)
 
     return total_score, contributions
@@ -128,21 +155,60 @@ function compute_raw_pathway_score(gene_burdens_for_sample, pathway_genes, gene_
 ### Step 3: Size Normalization
 
 ```python
-function normalize_by_size(raw_score, pathway_size):
+function normalize_by_size(raw_score, pathway_size, method="sqrt"):
     """
     Normalize pathway score by pathway size.
-    Larger pathways have more opportunity for hits.
+    Larger pathways have more opportunity for hits by chance.
+
+    Args:
+        raw_score: Unnormalized pathway score
+        pathway_size: Number of genes in the pathway
+        method: Normalization method ("sqrt", "linear", "log")
+
+    Returns:
+        Size-normalized score
+
+    Edge Cases:
+        - pathway_size == 0: Returns 0.0 (avoid division by zero)
+        - pathway_size == 1: Returns raw_score (no normalization needed)
+        - raw_score == 0: Returns 0.0 (regardless of size)
 
     Common approaches:
-    - Divide by size
-    - Divide by sqrt(size)
-    - Divide by log(size)
+        - linear: score / size
+            Pro: Simple, intuitive
+            Con: May over-penalize large pathways
+        - sqrt: score / sqrt(size) [DEFAULT]
+            Pro: Balances size effect, widely used in enrichment analysis
+            Con: May still favor smaller pathways slightly
+        - log: score / log2(size)
+            Pro: Gentler normalization for large pathways
+            Con: Less intuitive interpretation
+
+    Note: The choice of normalization affects pathway ranking.
+    Square root is most common in pathway enrichment literature.
     """
+    # Handle edge cases
     if pathway_size == 0:
         return 0.0
 
-    # Square root normalization (balances size effect)
-    normalized = raw_score / math.sqrt(pathway_size)
+    if raw_score == 0:
+        return 0.0
+
+    if pathway_size == 1:
+        return raw_score
+
+    # Apply normalization based on method
+    if method == "sqrt":
+        # Square root normalization (balances size effect)
+        normalized = raw_score / math.sqrt(pathway_size)
+    elif method == "linear":
+        # Simple size normalization
+        normalized = raw_score / pathway_size
+    elif method == "log":
+        # Logarithmic normalization (gentler for large pathways)
+        normalized = raw_score / math.log2(pathway_size + 1)
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
 
     return normalized
 ```

@@ -1,0 +1,100 @@
+{
+  "SAMPLE_001": {
+    "pathways": {
+      "GO:0007268": {
+        "raw_score": 2.5,
+        "normalized_score": 0.35,
+        "z_score": 1.8,
+        "pathway_size": 8,
+        "genes_with_burden": 2,
+        "contributing_genes": [
+          {"gene_id": "SHANK3", "contribution": 1.5},
+          {"gene_id": "NRXN1", "contribution": 1.0}
+        ]
+      },
+      "GO:0006351": {
+        "raw_score": 0.5,
+        "normalized_score": 0.18,
+        "z_score": 0.6,
+        "pathway_size": 8,
+        "genes_with_burden": 1,
+        "contributing_genes": [
+          {"gene_id": "CHD8", "contribution": 0.5}
+        ]
+      },
+      "CUSTOM:ASD_HIGH": {
+        "raw_score": 2.0,
+        "normalized_score": 0.71,
+        "z_score": 2.1,
+        "pathway_size": 8,
+        "genes_with_burden": 2,
+        "contributing_genes": [
+          {"gene_id": "SHANK3", "contribution": 1.5},
+          {"gene_id": "CHD8", "contribution": 0.5}
+        ]
+      }
+    }
+  },
+  "SAMPLE_002": {
+    "pathways": {
+      "GO:0007268": {
+        "raw_score": 1.8,
+        "normalized_score": 0.25,
+        "z_score": 1.2,
+        "pathway_size": 8,
+        "genes_with_burden": 2,
+        "contributing_genes": [
+          {"gene_id": "SYNGAP1", "contribution": 1.0},
+          {"gene_id": "GRIN2B", "contribution": 0.8}
+        ]
+      },
+      "KEGG:04724": {
+        "raw_score": 0.8,
+        "normalized_score": 0.30,
+        "z_score": 0.9,
+        "pathway_size": 7,
+        "genes_with_burden": 1,
+        "contributing_genes": [
+          {"gene_id": "GRIN2B", "contribution": 0.8}
+        ]
+      }
+    }
+  },
+  "SAMPLE_003": {
+    "pathways": {
+      "GO:0007268": {
+        "raw_score": 1.8,
+        "normalized_score": 0.25,
+        "z_score": 1.2,
+        "pathway_size": 8,
+        "genes_with_burden": 2,
+        "contributing_genes": [
+          {"gene_id": "SCN2A", "contribution": 1.2},
+          {"gene_id": "SHANK3", "contribution": 0.6}
+        ]
+      },
+      "GO:0007399": {
+        "raw_score": 1.0,
+        "normalized_score": 0.35,
+        "z_score": 1.0,
+        "pathway_size": 8,
+        "genes_with_burden": 1,
+        "contributing_genes": [
+          {"gene_id": "ARID1B", "contribution": 1.0}
+        ]
+      },
+      "CUSTOM:ASD_HIGH": {
+        "raw_score": 2.8,
+        "normalized_score": 0.99,
+        "z_score": 2.5,
+        "pathway_size": 8,
+        "genes_with_burden": 3,
+        "contributing_genes": [
+          {"gene_id": "SCN2A", "contribution": 1.2},
+          {"gene_id": "ARID1B", "contribution": 1.0},
+          {"gene_id": "SHANK3", "contribution": 0.6}
+        ]
+      }
+    }
+  }
+}
