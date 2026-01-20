@@ -59,12 +59,38 @@ Pathway scores are refined using:
 - Network propagation algorithms
 - Connectivity-based signal amplification
 
-### 4. Subtype Discovery
+### 4. Biological Context Integration
+
+Domain knowledge is embedded intrinsically through:
+- **Developmental expression**: BrainSpan prenatal/postnatal expression patterns
+- **Cell-type specificity**: Single-cell atlas integration (Allen Brain)
+- **Gene constraint**: gnomAD pLI/LOEUF scores, SFARI gene annotations
+- **Foundation model embeddings**: Geneformer, ESM-2, and literature-based representations
+
+### 5. Subtype Discovery
 
 Per-individual pathway profiles are used for:
 - Unsupervised clustering (GMM, spectral, hierarchical)
 - Identification of **genetically coherent subgroups**
 - Probabilistic subtype membership assignment
+
+### 6. Neuro-Symbolic Reasoning
+
+Combines neural predictions with biological rules:
+- **R1**: Constrained LoF in developing cortex → high-confidence disruption
+- **R2**: Multiple pathway hits → convergence signal
+- **R3**: CHD8 cascade → chromatin regulation subtype
+- **R4**: Synaptic gene + excitatory neuron expression → synaptic subtype
+- **R5**: Intact paralog → potential compensation
+- **R6**: Drug-pathway targeting → therapeutic hypothesis
+
+### 7. Causal Inference
+
+Enables mechanistic reasoning:
+- **Structural causal models**: Explicit causal chains from variant to phenotype
+- **Intervention queries**: "What if we target this pathway?"
+- **Counterfactual reasoning**: "Would phenotype differ if gene were intact?"
+- **Mediation analysis**: Direct vs. indirect effects through pathways
 
 ---
 
@@ -84,6 +110,13 @@ Per-individual pathway profiles are used for:
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
+│                  BIOLOGICAL CONTEXT LAYER                        │
+│  BrainSpan expression • Single-cell atlas • Gene constraints     │
+│  Foundation model embeddings (Geneformer, ESM-2)                 │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
 │                    AGGREGATION LAYER                             │
 │  Variant → Gene burdens → Pathway scores → Network refinement    │
 └─────────────────────────────────────────────────────────────────┘
@@ -96,8 +129,15 @@ Per-individual pathway profiles are used for:
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
+│                    REASONING LAYER                               │
+│  Neuro-symbolic rules (R1-R6) • Causal inference • Explanations  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
 │                      OUTPUT LAYER                                │
 │  Subtype definitions • Pathway profiles • Hypothesis reports     │
+│  Causal analysis • Reasoning chains • Evidence trails            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -136,8 +176,38 @@ This enables **research-only** therapeutic hypothesis generation, prioritizing:
 - Biological plausibility
 - Mechanistic alignment
 - Evidence strength
+- **Causal support**: Intervention queries validate that targeting a pathway would plausibly affect outcome
+
+### Causal Validation of Hypotheses
+
+The framework uses causal inference to strengthen therapeutic hypotheses:
+
+1. **Intervention queries**: Estimate P(phenotype | do(pathway_targeted))
+2. **Mediation analysis**: Quantify how much of a gene's effect flows through the target pathway
+3. **Counterfactual reasoning**: "Would phenotype differ if this pathway were restored?"
+
+Hypotheses with strong causal support are prioritized over those based on correlation alone.
 
 All hypotheses require independent experimental and clinical validation.
+
+---
+
+---
+
+## Architecture Summary
+
+The framework implements a **layered hybrid architecture**:
+
+| Layer | Components | Purpose |
+|-------|------------|---------|
+| **Data Foundation** | VCF loaders, expression loaders, constraint loaders | Standardized data ingestion |
+| **Biological Context** | BrainSpan, single-cell atlas, gnomAD, SFARI | Developmental and cell-type specificity |
+| **Knowledge Representation** | Knowledge graph, graph embeddings, foundation models | Structured biological relationships |
+| **Neural Models** | Ontology-aware GNN, pathway scoring, clustering | Pattern learning and aggregation |
+| **Symbolic Reasoning** | Rule engine (R1-R6), neuro-symbolic integration | Explainable biological inference |
+| **Causal Inference** | SCM, do-calculus, counterfactuals, mediation | Mechanistic validation |
+
+This design makes domain knowledge **intrinsic** rather than external, improving biological plausibility and cross-cohort generalization.
 
 ---
 
@@ -146,3 +216,5 @@ All hypotheses require independent experimental and clinical validation.
 - [Pathway Scoring Concept](pathway_scoring_concept.md) - Detailed scoring methodology
 - [Stability and Replication](stability_replication.md) - Validation approaches
 - [Limitations](limitations.md) - Known constraints and caveats
+- [Domain Knowledge Integration](domain_knowledge_integration_analysis.md) - Technical deep-dive on knowledge embedding
+- [Implementation Plan](implementation_plan.md) - Session-by-session development guide

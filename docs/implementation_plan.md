@@ -36,6 +36,9 @@ autism-genetics-platform/
 │   │   ├── vcf_loader.py              # VCF parsing
 │   │   ├── annotation_loader.py       # External annotations
 │   │   ├── pathway_loader.py          # GO, Reactome, KEGG
+│   │   ├── expression_loader.py       # BrainSpan developmental expression
+│   │   ├── single_cell_loader.py      # Single-cell atlas (Allen Brain)
+│   │   ├── constraint_loader.py       # gnomAD pLI/LOEUF scores
 │   │   └── tests/
 │   │
 │   ├── 02_variant_processing/         # Phase 1B
@@ -109,12 +112,21 @@ autism-genetics-platform/
 │   │   ├── combiner.py                # Learned combination
 │   │   └── tests/
 │   │
-│   └── 11_therapeutic_hypotheses/     # Phase 4C
+│   ├── 11_therapeutic_hypotheses/     # Phase 4C
+│   │   ├── README.md
+│   │   ├── __init__.py
+│   │   ├── pathway_drug_mapping.py    # Pathway → drug links
+│   │   ├── ranking.py                 # Hypothesis ranking
+│   │   ├── evidence.py                # Evidence scoring
+│   │   └── tests/
+│   │
+│   └── 12_causal_inference/           # Phase 5 (Advanced)
 │       ├── README.md
 │       ├── __init__.py
-│       ├── pathway_drug_mapping.py    # Pathway → drug links
-│       ├── ranking.py                 # Hypothesis ranking
-│       ├── evidence.py                # Evidence scoring
+│       ├── causal_graph.py            # Structural causal model
+│       ├── do_calculus.py             # Intervention reasoning
+│       ├── counterfactuals.py         # Counterfactual queries
+│       ├── effect_estimation.py       # Direct/indirect effects
 │       └── tests/
 │
 ├── pipelines/                          # End-to-end workflows
@@ -171,6 +183,24 @@ class PathwayLoader:
     def load_reactome(self, gmt_path: str) -> PathwayDatabase
     def merge(self, databases: List[PathwayDatabase]) -> PathwayDatabase
 
+class ExpressionLoader:
+    """Load developmental expression data (BrainSpan)."""
+    def load_brainspan(self, data_dir: str) -> DevelopmentalExpression
+    def get_expression_by_stage(self, gene_id: str, stage: str) -> float
+    def get_prenatal_expressed_genes(self, threshold: float = 1.0) -> List[str]
+
+class SingleCellLoader:
+    """Load single-cell atlas data (Allen Brain, other cortical atlases)."""
+    def load_allen_brain(self, h5ad_path: str) -> SingleCellAtlas
+    def get_cell_type_markers(self, cell_type: str) -> List[str]
+    def get_expression_by_cell_type(self, gene_id: str) -> Dict[str, float]
+
+class ConstraintLoader:
+    """Load gene constraint scores (gnomAD pLI/LOEUF, SFARI)."""
+    def load_gnomad_constraints(self, tsv_path: str) -> GeneConstraints
+    def load_sfari_genes(self, csv_path: str) -> SFARIGenes
+    def get_constrained_genes(self, pli_threshold: float = 0.9) -> List[str]
+
 # Data structures defined in this module
 @dataclass
 class Variant:
@@ -187,6 +217,45 @@ class VariantDataset:
     variants: List[Variant]
     samples: List[str]
     metadata: Dict
+
+@dataclass
+class DevelopmentalExpression:
+    """BrainSpan developmental expression matrix."""
+    genes: List[str]
+    stages: List[str]  # e.g., ["8pcw", "12pcw", ..., "40y"]
+    regions: List[str]  # Brain regions
+    expression: np.ndarray  # shape: (n_genes, n_stages, n_regions)
+
+    def get_prenatal_expression(self, gene_id: str) -> np.ndarray
+    def get_cortical_expression(self, gene_id: str, stage: str) -> float
+
+@dataclass
+class SingleCellAtlas:
+    """Single-cell expression atlas."""
+    genes: List[str]
+    cell_types: List[str]
+    expression: np.ndarray  # shape: (n_genes, n_cell_types)
+    cell_type_hierarchy: Dict[str, List[str]]  # e.g., {"neuron": ["excitatory", "inhibitory"]}
+
+    def get_cell_type_specific_genes(self, cell_type: str, fold_change: float = 2.0) -> List[str]
+
+@dataclass
+class GeneConstraints:
+    """Gene constraint scores from gnomAD."""
+    gene_ids: List[str]
+    pli_scores: Dict[str, float]  # Probability of LoF intolerance
+    loeuf_scores: Dict[str, float]  # Loss-of-function observed/expected upper bound
+    mis_z_scores: Dict[str, float]  # Missense Z-scores
+
+    def is_constrained(self, gene_id: str, pli_threshold: float = 0.9) -> bool
+
+@dataclass
+class SFARIGenes:
+    """SFARI autism gene database."""
+    gene_ids: List[str]
+    scores: Dict[str, int]  # 1 = high confidence, 2 = strong candidate, 3 = suggestive
+    syndromic: Dict[str, bool]
+    evidence: Dict[str, List[str]]
 ```
 
 **Standalone Test**:
@@ -311,32 +380,196 @@ class NodeEmbeddings:
 
 ---
 
-#### Module 05: Pretrained Embeddings (Session 5)
+#### Module 05: Pretrained Embeddings (Sessions 5-5B)
 
-**Scope**: ~400 lines
-**Dependencies**: None (uses external models)
+**Scope**: ~600 lines (split into 2 sessions if fine-tuning implemented)
+**Dependencies**: Module 01 (expression data for fine-tuning context)
 **Interface Contract**:
 
 ```python
-# Input: Gene list
-# Output: Pretrained embeddings
+# Input: Gene list + optional fine-tuning data
+# Output: Pretrained or fine-tuned embeddings
+
+from enum import Enum
+
+class ExtractionMode(Enum):
+    FROZEN = "frozen"      # Use pretrained weights as-is
+    FINE_TUNED = "fine_tuned"  # Fine-tune on autism-specific data
 
 class GeneformerExtractor:
-    def __init__(self, model_path: str)
-    def extract(self, gene_ids: List[str]) -> NodeEmbeddings
+    """
+    Extract gene embeddings from Geneformer.
+
+    Geneformer learns gene representations from single-cell expression data.
+    Can be fine-tuned on brain-specific or autism-specific data.
+    """
+
+    def __init__(self, model_path: str, device: str = "cuda"):
+        self.model = self.load_model(model_path)
+        self.device = device
+
+    def extract(self, gene_ids: List[str], mode: ExtractionMode = ExtractionMode.FROZEN) -> NodeEmbeddings:
+        """Extract embeddings for given genes."""
+
+    def fine_tune(self,
+                  training_data: SingleCellDataset,
+                  config: FineTuneConfig) -> 'GeneformerExtractor':
+        """
+        Fine-tune Geneformer on autism-specific single-cell data.
+
+        Recommended datasets for fine-tuning:
+        - Brain organoid single-cell data
+        - Postmortem ASD brain tissue
+        - Developing cortex (fetal) data
+        """
+
+    def extract_with_context(self,
+                              gene_ids: List[str],
+                              cell_type_context: str) -> NodeEmbeddings:
+        """
+        Extract cell-type-contextualized embeddings.
+
+        Different embeddings for same gene in different cell types.
+        """
 
 class ESM2Extractor:
-    def __init__(self, model_name: str)
-    def extract(self, protein_sequences: Dict[str, str]) -> NodeEmbeddings
+    """
+    Extract protein embeddings from ESM-2.
+
+    ESM-2 learns protein representations from evolutionary sequences.
+    Captures structural and functional information.
+    """
+
+    def __init__(self, model_name: str = "esm2_t33_650M_UR50D"):
+        self.model = self.load_model(model_name)
+
+    def extract(self, protein_sequences: Dict[str, str]) -> NodeEmbeddings:
+        """Extract embeddings via mean pooling over sequence."""
+
+    def extract_with_variant(self,
+                              protein_sequences: Dict[str, str],
+                              variants: Dict[str, List[Variant]]) -> NodeEmbeddings:
+        """
+        Extract embeddings considering variant effects.
+
+        For missense variants, compute embedding difference between
+        wild-type and mutant sequence to capture variant impact.
+        """
+
+    def predict_variant_effect(self,
+                                wt_sequence: str,
+                                variant: Variant) -> VariantEffect:
+        """
+        Use ESM-2 log-likelihood ratio to predict variant pathogenicity.
+        """
+
+class LiteratureEmbedder:
+    """
+    Extract gene embeddings from biomedical literature.
+
+    Uses PubMedBERT/BioGPT to embed gene descriptions and associations.
+    """
+
+    def __init__(self, model_name: str = "microsoft/BiomedNLP-PubMedBERT-base-uncased-abstract"):
+        self.model = self.load_model(model_name)
+
+    def extract_from_descriptions(self, gene_descriptions: Dict[str, str]) -> NodeEmbeddings:
+        """Embed gene functional descriptions."""
+
+    def extract_from_abstracts(self, gene_pmids: Dict[str, List[str]]) -> NodeEmbeddings:
+        """Embed aggregated literature about each gene."""
 
 class EmbeddingFusion:
+    """
+    Fuse multiple embedding sources into unified gene representation.
+    """
+
+    def __init__(self, fusion_method: str = "learned"):
+        self.fusion_method = fusion_method
+
     def fuse(self,
              kg_embeddings: NodeEmbeddings,
              geneformer_embeddings: NodeEmbeddings,
-             esm2_embeddings: NodeEmbeddings) -> NodeEmbeddings
+             esm2_embeddings: NodeEmbeddings,
+             literature_embeddings: Optional[NodeEmbeddings] = None) -> NodeEmbeddings:
+        """
+        Fuse embeddings from multiple sources.
+
+        Methods:
+        - "concat": Simple concatenation
+        - "weighted_sum": Learned weights per source
+        - "attention": Cross-attention fusion
+        - "learned": MLP-based learned fusion
+        """
+
+    def fuse_with_learned_weights(self,
+                                   embeddings: List[NodeEmbeddings],
+                                   labels: Optional[np.ndarray] = None) -> NodeEmbeddings:
+        """
+        Learn optimal fusion weights from downstream task.
+
+        If labels provided (e.g., SFARI gene labels), optimize weights
+        to maximize predictive performance.
+        """
+
+@dataclass
+class FineTuneConfig:
+    """Configuration for foundation model fine-tuning."""
+    learning_rate: float = 1e-5
+    epochs: int = 10
+    batch_size: int = 32
+    warmup_steps: int = 500
+    weight_decay: float = 0.01
+    # Multi-task fine-tuning
+    tasks: List[str] = None  # e.g., ["pathway_prediction", "phenotype_prediction"]
+    task_weights: Dict[str, float] = None
+    # Adapter-based fine-tuning (parameter efficient)
+    use_adapters: bool = True
+    adapter_dim: int = 64
+
+@dataclass
+class VariantEffect:
+    """Predicted effect of a genetic variant."""
+    gene_id: str
+    variant: Variant
+    pathogenicity_score: float  # 0-1
+    embedding_shift: np.ndarray  # Change in embedding space
+    confidence: float
+
+class MultiTaskFineTuner:
+    """
+    Fine-tune foundation models on multiple autism-relevant tasks.
+
+    Tasks:
+    1. Pathway membership prediction
+    2. SFARI gene classification
+    3. Phenotype association prediction
+    4. Gene-gene interaction prediction
+    """
+
+    def __init__(self, base_model: nn.Module, tasks: List[str]):
+        self.base_model = base_model
+        self.task_heads = self.create_task_heads(tasks)
+
+    def fine_tune(self,
+                  datasets: Dict[str, Dataset],
+                  config: FineTuneConfig) -> nn.Module:
+        """Multi-task fine-tuning with task-specific heads."""
+
+    def extract_fine_tuned_embeddings(self, gene_ids: List[str]) -> NodeEmbeddings:
+        """Extract embeddings from fine-tuned model."""
 ```
 
-**Note**: This module can be implemented in parallel with Module 04.
+**Session 5A: Extraction (Frozen)**
+- Implement GeneformerExtractor, ESM2Extractor, LiteratureEmbedder
+- Basic fusion methods
+
+**Session 5B: Fine-tuning (Optional, Advanced)**
+- Implement FineTuneConfig, MultiTaskFineTuner
+- Adapter-based fine-tuning for parameter efficiency
+- Variant-aware ESM-2 extraction
+
+**Note**: This module can be implemented in parallel with Module 04. Session 5B (fine-tuning) is optional for v1.
 
 ---
 
@@ -477,49 +710,268 @@ class SubtypeProfile:
 
 #### Module 09: Symbolic Rules (Session 10)
 
-**Scope**: ~500 lines
-**Dependencies**: Module 02 (gene data), Module 07 (pathway scores)
+**Scope**: ~600 lines
+**Dependencies**: Module 01 (constraint/expression data), Module 02 (gene data), Module 07 (pathway scores)
 **Interface Contract**:
 
 ```python
-# Input: Gene/pathway data
-# Output: Rule-based inferences
+# Input: Gene/pathway data + biological context
+# Output: Rule-based inferences with explanations
+
+@dataclass
+class Condition:
+    """A single condition in a rule."""
+    predicate: str  # e.g., "has_lof_variant", "is_constrained", "expressed_in"
+    arguments: Dict[str, Any]
+    negated: bool = False
+
+@dataclass
+class Conclusion:
+    """The conclusion of a fired rule."""
+    type: str  # e.g., "pathway_disruption", "subtype_indicator", "therapeutic_candidate"
+    attributes: Dict[str, Any]
+    confidence_modifier: float = 1.0
 
 @dataclass
 class Rule:
     id: str
     name: str
+    description: str
     conditions: List[Condition]
     conclusion: Conclusion
-    confidence: float
+    base_confidence: float
+    evidence_sources: List[str]  # Literature references
 
 class RuleEngine:
-    def __init__(self, rules: List[Rule])
-    def evaluate(self,
-                 individual_data: IndividualData) -> List[FiredRule]
+    def __init__(self, rules: List[Rule], biological_context: BiologicalContext)
+    def evaluate(self, individual_data: IndividualData) -> List[FiredRule]
+    def evaluate_batch(self, cohort_data: List[IndividualData]) -> Dict[str, List[FiredRule]]
     def explain(self, fired_rule: FiredRule) -> str
+    def get_reasoning_chain(self, fired_rules: List[FiredRule]) -> ReasoningChain
 
 class BiologicalRules:
-    """Curated biological rules."""
+    """Curated autism-specific biological rules (R1-R6 from domain analysis)."""
 
     @staticmethod
-    def developmental_timing_rule() -> Rule
+    def R1_constrained_lof_developing_cortex() -> Rule:
+        """
+        R1: LoF in constrained gene expressed in developing cortex
+        → High-confidence pathway disruption
+
+        Conditions:
+        - Individual has loss-of-function variant in gene G
+        - Gene G has pLI > 0.9 (highly constrained)
+        - Gene G is expressed in developing cortex (BrainSpan prenatal)
+
+        Conclusion: High-confidence pathway disruption for pathways containing G
+        """
+        return Rule(
+            id="R1",
+            name="Constrained LoF in Developing Cortex",
+            description="Loss-of-function variant in constrained gene with prenatal cortical expression",
+            conditions=[
+                Condition("has_variant", {"gene": "G", "variant_type": "loss_of_function"}),
+                Condition("gene_constraint", {"gene": "G", "pli_threshold": 0.9}),
+                Condition("expressed_in", {"gene": "G", "tissue": "cortex", "stage": "prenatal"})
+            ],
+            conclusion=Conclusion("pathway_disruption", {"confidence": "high", "mechanism": "haploinsufficiency"}),
+            base_confidence=0.9,
+            evidence_sources=["gnomAD constraint", "BrainSpan expression"]
+        )
 
     @staticmethod
-    def cell_type_specificity_rule() -> Rule
+    def R2_pathway_convergence() -> Rule:
+        """
+        R2: Multiple hits in same pathway (≥2 genes)
+        → Pathway-level convergence signal
+
+        Conditions:
+        - Individual has damaging variants in genes G1, G2, ...
+        - G1 and G2 are both members of pathway P
+        - Hits are in distinct genes (not compound het in same gene)
+
+        Conclusion: Strong pathway convergence evidence
+        """
+        return Rule(
+            id="R2",
+            name="Pathway Convergence",
+            description="Multiple independent hits converging on same biological pathway",
+            conditions=[
+                Condition("has_multiple_hits", {"min_genes": 2, "pathway": "P"}),
+                Condition("hits_are_independent", {"pathway": "P"})
+            ],
+            conclusion=Conclusion("pathway_convergence", {"strength": "strong"}),
+            base_confidence=0.85,
+            evidence_sources=["Pathway membership", "Variant independence"]
+        )
 
     @staticmethod
-    def compensatory_mechanism_rule() -> Rule
+    def R3_chd8_cascade() -> Rule:
+        """
+        R3: Disruption in CHD8 or its regulatory targets
+        → Chromatin regulation cascade
+
+        Conditions:
+        - Individual has damaging variant in CHD8 OR
+        - Individual has damaging variant in known CHD8 target gene
+
+        Conclusion: Chromatin regulation cascade disruption (known ASD mechanism)
+        """
+        return Rule(
+            id="R3",
+            name="CHD8 Chromatin Cascade",
+            description="Disruption in CHD8 regulatory network affecting chromatin remodeling",
+            conditions=[
+                Condition("has_variant", {"gene": "CHD8", "variant_type": "damaging"}, negated=False),
+                # OR condition handled by rule engine
+                Condition("is_chd8_target", {"gene": "G"})
+            ],
+            conclusion=Conclusion("pathway_disruption", {
+                "pathway": "chromatin_regulation",
+                "mechanism": "CHD8_cascade",
+                "subtype_indicator": "chromatin_remodeling"
+            }),
+            base_confidence=0.88,
+            evidence_sources=["Cotney et al. 2015", "Sugathan et al. 2014"]
+        )
 
     @staticmethod
-    def get_all_rules() -> List[Rule]
+    def R4_synaptic_excitatory() -> Rule:
+        """
+        R4: Synaptic gene hit + expression in excitatory neurons
+        → Synaptic subtype indicator
+
+        Conditions:
+        - Individual has damaging variant in synaptic gene (SynGO annotated)
+        - Gene is preferentially expressed in excitatory neurons
+
+        Conclusion: Synaptic dysfunction subtype indicator
+        """
+        return Rule(
+            id="R4",
+            name="Synaptic Excitatory Disruption",
+            description="Synaptic gene disruption with excitatory neuron expression pattern",
+            conditions=[
+                Condition("has_variant", {"gene": "G", "variant_type": "damaging"}),
+                Condition("is_synaptic_gene", {"gene": "G", "ontology": "SynGO"}),
+                Condition("cell_type_expression", {"gene": "G", "cell_type": "excitatory_neuron", "enriched": True})
+            ],
+            conclusion=Conclusion("subtype_indicator", {
+                "subtype": "synaptic_dysfunction",
+                "cell_type": "excitatory",
+                "mechanism": "synaptic_transmission"
+            }),
+            base_confidence=0.82,
+            evidence_sources=["SynGO", "Single-cell expression atlas"]
+        )
+
+    @staticmethod
+    def R5_compensatory_paralog() -> Rule:
+        """
+        R5: Paralog intact + expressed
+        → Potential compensation (reduced penetrance)
+
+        Conditions:
+        - Individual has loss-of-function variant in gene G
+        - Gene G has a paralog P
+        - Paralog P is NOT disrupted in this individual
+        - Paralog P is highly expressed in relevant tissue
+
+        Conclusion: Potential functional compensation (modifier of effect)
+        """
+        return Rule(
+            id="R5",
+            name="Paralog Compensation",
+            description="Intact expressed paralog may compensate for disrupted gene",
+            conditions=[
+                Condition("has_variant", {"gene": "G", "variant_type": "loss_of_function"}),
+                Condition("has_paralog", {"gene": "G", "paralog": "P"}),
+                Condition("has_variant", {"gene": "P", "variant_type": "damaging"}, negated=True),
+                Condition("expressed_in", {"gene": "P", "tissue": "brain", "level": "high"})
+            ],
+            conclusion=Conclusion("effect_modifier", {
+                "modifier_type": "compensation",
+                "confidence_reduction": 0.3,
+                "mechanism": "paralog_redundancy"
+            }),
+            base_confidence=0.7,
+            evidence_sources=["Paralog databases", "Expression data"]
+        )
+
+    @staticmethod
+    def R6_drug_pathway_target() -> Rule:
+        """
+        R6: Drug targets disrupted pathway
+        → Therapeutic hypothesis candidate
+
+        Conditions:
+        - Pathway P is disrupted in individual (from pathway scoring)
+        - Drug D has known target gene T
+        - Gene T is a member of pathway P
+        - Drug D mechanism aligns with pathway biology
+
+        Conclusion: Therapeutic hypothesis candidate
+        """
+        return Rule(
+            id="R6",
+            name="Therapeutic Pathway Target",
+            description="Drug targets gene within disrupted pathway",
+            conditions=[
+                Condition("pathway_disrupted", {"pathway": "P", "score_threshold": 2.0}),
+                Condition("drug_targets", {"drug": "D", "target": "T"}),
+                Condition("gene_in_pathway", {"gene": "T", "pathway": "P"}),
+                Condition("mechanism_alignment", {"drug": "D", "pathway": "P"})
+            ],
+            conclusion=Conclusion("therapeutic_hypothesis", {
+                "drug": "D",
+                "target_pathway": "P",
+                "requires_validation": True
+            }),
+            base_confidence=0.6,
+            evidence_sources=["DrugBank", "Pathway databases", "Mechanism annotations"]
+        )
+
+    @staticmethod
+    def get_all_rules() -> List[Rule]:
+        """Return all curated biological rules."""
+        return [
+            BiologicalRules.R1_constrained_lof_developing_cortex(),
+            BiologicalRules.R2_pathway_convergence(),
+            BiologicalRules.R3_chd8_cascade(),
+            BiologicalRules.R4_synaptic_excitatory(),
+            BiologicalRules.R5_compensatory_paralog(),
+            BiologicalRules.R6_drug_pathway_target()
+        ]
 
 @dataclass
 class FiredRule:
     rule: Rule
-    bindings: Dict[str, Any]
-    confidence: float
+    bindings: Dict[str, Any]  # Variable assignments that satisfied conditions
+    confidence: float  # Final confidence after modifiers
     explanation: str
+    evidence: Dict[str, Any]  # Supporting data for this firing
+
+@dataclass
+class ReasoningChain:
+    """Chain of reasoning from variants to conclusions."""
+    individual_id: str
+    fired_rules: List[FiredRule]
+    pathway_conclusions: Dict[str, float]
+    subtype_indicators: List[str]
+    therapeutic_hypotheses: List[Dict]
+    explanation_text: str
+
+@dataclass
+class BiologicalContext:
+    """Biological reference data needed for rule evaluation."""
+    gene_constraints: GeneConstraints
+    developmental_expression: DevelopmentalExpression
+    single_cell_atlas: SingleCellAtlas
+    sfari_genes: SFARIGenes
+    paralog_map: Dict[str, List[str]]
+    chd8_targets: List[str]
+    syngo_genes: List[str]
+    drug_targets: Dict[str, List[str]]
 ```
 
 ---
@@ -647,14 +1099,19 @@ For each session:
 **Files to Create**:
 ```
 modules/01_data_loaders/
-├── README.md           # Module documentation
-├── __init__.py         # Exports
-├── vcf_loader.py       # ~150 lines
-├── annotation_loader.py # ~100 lines
-├── pathway_loader.py   # ~150 lines
+├── README.md              # Module documentation
+├── __init__.py            # Exports
+├── vcf_loader.py          # ~150 lines
+├── annotation_loader.py   # ~100 lines
+├── pathway_loader.py      # ~150 lines
+├── expression_loader.py   # ~150 lines (BrainSpan)
+├── single_cell_loader.py  # ~150 lines (Allen Brain)
+├── constraint_loader.py   # ~100 lines (gnomAD, SFARI)
 └── tests/
     ├── test_vcf_loader.py
-    └── test_pathway_loader.py
+    ├── test_pathway_loader.py
+    ├── test_expression_loader.py
+    └── test_constraint_loader.py
 ```
 
 **Success Criteria**:
@@ -733,23 +1190,32 @@ modules/04_graph_embeddings/
 
 ---
 
-### Session 5: Pretrained Embeddings
+### Sessions 5-5B: Pretrained Embeddings
 
-**Context Needed**:
+**Session 5A Context Needed**:
 - Geneformer API documentation
 - ESM-2 API documentation
 - Embedding fusion approach
+
+**Session 5B Context Needed** (Optional):
+- Adapter-based fine-tuning (LoRA, etc.)
+- Multi-task learning setup
+- Autism-specific datasets (SFARI, brain single-cell)
 
 **Files to Create**:
 ```
 modules/05_pretrained_embeddings/
 ├── README.md
 ├── __init__.py
-├── geneformer_extractor.py  # ~150 lines
-├── esm2_extractor.py        # ~150 lines
-├── fusion.py                # ~100 lines
+├── geneformer_extractor.py  # ~200 lines
+├── esm2_extractor.py        # ~200 lines
+├── literature_embedder.py   # ~100 lines
+├── fusion.py                # ~150 lines
+├── fine_tuning.py           # ~150 lines (Session 5B, optional)
 └── tests/
-    └── test_extractors.py
+    ├── test_extractors.py
+    ├── test_fusion.py
+    └── test_fine_tuning.py
 ```
 
 ---
@@ -834,11 +1300,14 @@ modules/08_subtype_clustering/
 modules/09_symbolic_rules/
 ├── README.md
 ├── __init__.py
-├── rule_engine.py          # ~200 lines
-├── biological_rules.py     # ~200 lines
-├── explanation.py          # ~100 lines
+├── rule_engine.py          # ~250 lines
+├── biological_rules.py     # ~300 lines (R1-R6 implementations)
+├── conditions.py           # ~100 lines (condition evaluators)
+├── explanation.py          # ~150 lines (reasoning chain generation)
 └── tests/
-    └── test_rules.py
+    ├── test_rules.py
+    ├── test_rule_engine.py
+    └── test_explanations.py
 ```
 
 ---
@@ -884,11 +1353,318 @@ modules/11_therapeutic_hypotheses/
 
 ---
 
-## Cross-Module Integration (Sessions 13-14)
+### Phase 5: Causal Inference (Module 12)
+
+**Goal**: Enable causal reasoning about genetic mechanisms and intervention effects.
+
+#### Module 12: Causal Inference (Sessions 13-14)
+
+**Scope**: ~700 lines (split into 2 sessions)
+**Dependencies**: Module 03 (knowledge graph), Module 07 (pathway scores), Module 09 (rules)
+**Interface Contract**:
+
+```python
+# Input: Knowledge graph + pathway scores + variant data
+# Output: Causal queries, intervention reasoning, counterfactuals
+
+from enum import Enum
+from typing import Optional
+
+class CausalNodeType(Enum):
+    VARIANT = "variant"
+    GENE_FUNCTION = "gene_function"
+    PATHWAY = "pathway"
+    CIRCUIT = "circuit"
+    PHENOTYPE = "phenotype"
+    CONFOUNDER = "confounder"
+
+class CausalEdgeType(Enum):
+    CAUSES = "causes"
+    MEDIATES = "mediates"
+    CONFOUNDS = "confounds"
+    MODIFIES = "modifies"
+
+@dataclass
+class CausalNode:
+    id: str
+    node_type: CausalNodeType
+    observed: bool
+    value: Optional[float] = None
+    metadata: Dict[str, Any] = None
+
+@dataclass
+class CausalEdge:
+    source: str
+    target: str
+    edge_type: CausalEdgeType
+    strength: float  # Estimated causal effect strength
+    mechanism: str  # Biological mechanism description
+
+class StructuralCausalModel:
+    """
+    Structural Causal Model for ASD genetics.
+
+    Encodes the causal chain:
+    Genetic Variants → Gene Function Disruption → Pathway Perturbation
+                    → Circuit-Level Effects → Behavioral Phenotype
+
+    With explicit confounders:
+    - Ancestry
+    - Batch effects
+    - Ascertainment bias
+    """
+
+    def __init__(self):
+        self.nodes: Dict[str, CausalNode] = {}
+        self.edges: List[CausalEdge] = []
+        self.structural_equations: Dict[str, Callable] = {}
+
+    def add_node(self, node: CausalNode) -> None
+    def add_edge(self, edge: CausalEdge) -> None
+    def set_structural_equation(self, node_id: str, equation: Callable) -> None
+
+    def get_parents(self, node_id: str) -> List[str]
+    def get_children(self, node_id: str) -> List[str]
+    def get_ancestors(self, node_id: str) -> Set[str]
+    def get_descendants(self, node_id: str) -> Set[str]
+
+    def is_d_separated(self, x: str, y: str, conditioning: Set[str]) -> bool
+    def get_backdoor_paths(self, treatment: str, outcome: str) -> List[List[str]]
+    def get_valid_adjustment_sets(self, treatment: str, outcome: str) -> List[Set[str]]
+
+    @classmethod
+    def from_knowledge_graph(cls, kg: KnowledgeGraph) -> 'StructuralCausalModel':
+        """Construct SCM from biological knowledge graph."""
+
+class DoCalculusEngine:
+    """
+    Implements Pearl's do-calculus for intervention reasoning.
+
+    Enables queries like:
+    - P(phenotype | do(gene_disrupted))
+    - P(phenotype | do(pathway_targeted))
+    """
+
+    def __init__(self, scm: StructuralCausalModel):
+        self.scm = scm
+
+    def do(self, intervention: Dict[str, float]) -> 'IntervenedModel':
+        """
+        Apply do-operator: set node values and remove incoming edges.
+
+        Example:
+            engine.do({"SHANK3_function": 0})  # Simulate SHANK3 knockout
+        """
+
+    def query(self,
+              outcome: str,
+              intervention: Dict[str, float],
+              evidence: Optional[Dict[str, float]] = None) -> Distribution:
+        """
+        Compute P(outcome | do(intervention), evidence).
+
+        Example:
+            # What's the probability of ASD phenotype if we disrupt synaptic pathway?
+            engine.query(
+                outcome="asd_phenotype",
+                intervention={"synaptic_pathway": "disrupted"}
+            )
+        """
+
+    def average_treatment_effect(self,
+                                  treatment: str,
+                                  outcome: str,
+                                  treatment_values: Tuple[float, float] = (0, 1)) -> float:
+        """
+        Compute ATE = E[Y | do(T=1)] - E[Y | do(T=0)]
+        """
+
+    def conditional_average_treatment_effect(self,
+                                              treatment: str,
+                                              outcome: str,
+                                              subgroup: Dict[str, float]) -> float:
+        """
+        Compute CATE for a specific subgroup.
+        """
+
+class CounterfactualEngine:
+    """
+    Enables counterfactual reasoning.
+
+    Queries like:
+    - "Would phenotype differ if pathway X were intact?"
+    - "What if this individual had a different variant?"
+    """
+
+    def __init__(self, scm: StructuralCausalModel):
+        self.scm = scm
+
+    def counterfactual(self,
+                       factual_evidence: Dict[str, float],
+                       counterfactual_intervention: Dict[str, float],
+                       query_variable: str) -> Distribution:
+        """
+        Three-step counterfactual computation:
+        1. Abduction: Infer exogenous variables from factual evidence
+        2. Action: Apply counterfactual intervention
+        3. Prediction: Compute query variable under modified model
+
+        Example:
+            # For an individual with SHANK3 mutation and ASD diagnosis,
+            # what would phenotype be if SHANK3 were intact?
+            engine.counterfactual(
+                factual_evidence={"SHANK3_function": 0, "asd_diagnosis": 1},
+                counterfactual_intervention={"SHANK3_function": 1},
+                query_variable="asd_phenotype"
+            )
+        """
+
+    def probability_of_necessity(self,
+                                  treatment: str,
+                                  outcome: str,
+                                  factual: Dict[str, float]) -> float:
+        """
+        P(Y_0 = 0 | T = 1, Y = 1)
+        "Given that treatment happened and outcome occurred,
+         would outcome not have occurred without treatment?"
+        """
+
+    def probability_of_sufficiency(self,
+                                    treatment: str,
+                                    outcome: str,
+                                    factual: Dict[str, float]) -> float:
+        """
+        P(Y_1 = 1 | T = 0, Y = 0)
+        "Given that treatment didn't happen and outcome didn't occur,
+         would outcome have occurred with treatment?"
+        """
+
+class CausalEffectEstimator:
+    """
+    Estimate direct, indirect, and total causal effects.
+    """
+
+    def __init__(self, scm: StructuralCausalModel, do_engine: DoCalculusEngine):
+        self.scm = scm
+        self.do_engine = do_engine
+
+    def total_effect(self, treatment: str, outcome: str) -> float:
+        """Total causal effect of treatment on outcome."""
+
+    def direct_effect(self, treatment: str, outcome: str, mediator: str) -> float:
+        """
+        Natural Direct Effect: Effect not through mediator.
+
+        Example:
+            # Direct effect of gene on phenotype, not through pathway
+            estimator.direct_effect("SHANK3", "asd_phenotype", "synaptic_pathway")
+        """
+
+    def indirect_effect(self, treatment: str, outcome: str, mediator: str) -> float:
+        """
+        Natural Indirect Effect: Effect through mediator.
+
+        Example:
+            # How much of SHANK3's effect on phenotype is mediated by synaptic pathway?
+            estimator.indirect_effect("SHANK3", "asd_phenotype", "synaptic_pathway")
+        """
+
+    def mediation_analysis(self,
+                           treatment: str,
+                           outcome: str,
+                           mediator: str) -> MediationResult:
+        """
+        Full mediation analysis with proportion mediated.
+        """
+
+@dataclass
+class MediationResult:
+    total_effect: float
+    direct_effect: float
+    indirect_effect: float
+    proportion_mediated: float
+    confidence_interval: Tuple[float, float]
+
+@dataclass
+class CausalQuery:
+    """Structured representation of a causal query."""
+    query_type: str  # "intervention", "counterfactual", "effect"
+    treatment: str
+    outcome: str
+    intervention_value: Optional[float]
+    conditioning: Optional[Dict[str, float]]
+    mediator: Optional[str]
+
+class CausalQueryBuilder:
+    """Fluent interface for building causal queries."""
+
+    def treatment(self, var: str) -> 'CausalQueryBuilder'
+    def outcome(self, var: str) -> 'CausalQueryBuilder'
+    def given(self, evidence: Dict[str, float]) -> 'CausalQueryBuilder'
+    def do(self, intervention: Dict[str, float]) -> 'CausalQueryBuilder'
+    def mediated_by(self, mediator: str) -> 'CausalQueryBuilder'
+    def build(self) -> CausalQuery
+
+# Example usage:
+# query = CausalQueryBuilder()
+#     .treatment("CHD8_function")
+#     .outcome("asd_phenotype")
+#     .mediated_by("chromatin_pathway")
+#     .do({"CHD8_function": 0})
+#     .build()
+```
+
+**Session 13A: Structural Causal Model + Do-Calculus**
+```python
+# causal_graph.py + do_calculus.py (~350 lines)
+
+# Build SCM from knowledge graph
+# Implement do-operator
+# D-separation and adjustment sets
+# Basic intervention queries
+```
+
+**Session 13B: Counterfactuals + Effect Estimation**
+```python
+# counterfactuals.py + effect_estimation.py (~350 lines)
+
+# Three-step counterfactual algorithm
+# Probability of necessity/sufficiency
+# Direct/indirect effect estimation
+# Mediation analysis
+```
+
+**Files to Create**:
+```
+modules/12_causal_inference/
+├── README.md
+├── __init__.py
+├── causal_graph.py         # ~200 lines (SCM implementation)
+├── do_calculus.py          # ~200 lines (intervention reasoning)
+├── counterfactuals.py      # ~150 lines (counterfactual queries)
+├── effect_estimation.py    # ~150 lines (mediation analysis)
+└── tests/
+    ├── test_scm.py
+    ├── test_do_calculus.py
+    └── test_counterfactuals.py
+```
+
+**Success Criteria**:
+```bash
+python -m pytest modules/12_causal_inference/tests/ -v
+
+# Example validation: Known causal structure should yield correct effects
+# SHANK3 → synaptic_pathway → asd_phenotype
+# Direct effect should be small, indirect effect through pathway should be large
+```
+
+---
+
+## Cross-Module Integration (Sessions 17-18)
 
 After all modules are built, integration sessions combine them.
 
-### Session 13: Subtype Discovery Pipeline
+### Session 17: Subtype Discovery Pipeline
 
 **Context Needed**:
 - Module interfaces only (not implementations)
@@ -924,37 +1700,111 @@ class SubtypeDiscoveryPipeline:
 
 ---
 
-### Session 14: Full Pipeline with Hypotheses
+### Session 18: Full Pipeline with Hypotheses and Causal Reasoning
 
 **Context Needed**:
-- Session 13 pipeline
+- Session 17 pipeline
 - Therapeutic hypothesis module interface
+- Causal inference module interface
 
 **File to Create**:
 ```python
-# pipelines/therapeutic_hypothesis.py (~200 lines)
+# pipelines/therapeutic_hypothesis.py (~300 lines)
 
 class TherapeuticHypothesisPipeline:
     def __init__(self, config: PipelineConfig):
         self.subtype_pipeline = SubtypeDiscoveryPipeline(config)
-        self.rule_engine = RuleEngine(BiologicalRules.get_all_rules())
+        self.rule_engine = RuleEngine(BiologicalRules.get_all_rules(), config.bio_context)
         self.hypothesis_ranker = HypothesisRanker()
+        self.causal_model = StructuralCausalModel.from_knowledge_graph(config.kg)
+        self.do_engine = DoCalculusEngine(self.causal_model)
+        self.counterfactual_engine = CounterfactualEngine(self.causal_model)
 
     def run(self, vcf_path: str) -> TherapeuticResult:
         # Step 1: Discover subtypes
         subtype_result = self.subtype_pipeline.run(vcf_path)
 
-        # Step 2: Apply symbolic rules
+        # Step 2: Apply symbolic rules (R1-R6)
         rule_results = self.apply_rules(subtype_result)
 
         # Step 3: Generate hypotheses
         hypotheses = self.generate_hypotheses(subtype_result, rule_results)
 
+        # Step 4: Causal validation of hypotheses
+        causal_results = self.validate_with_causal_reasoning(hypotheses)
+
         return TherapeuticResult(
             subtypes=subtype_result,
             rules=rule_results,
-            hypotheses=hypotheses
+            hypotheses=hypotheses,
+            causal_analysis=causal_results
         )
+
+    def validate_with_causal_reasoning(self,
+                                        hypotheses: List[TherapeuticHypothesis]) -> CausalValidation:
+        """
+        Use causal inference to validate and rank therapeutic hypotheses.
+
+        For each hypothesis:
+        1. Estimate direct effect of drug target on outcome
+        2. Estimate indirect effect through disrupted pathway
+        3. Compute counterfactual: "What if pathway were targeted?"
+        """
+        validated = []
+        for hyp in hypotheses:
+            # Intervention query: What's effect of targeting this pathway?
+            intervention_effect = self.do_engine.query(
+                outcome="asd_phenotype",
+                intervention={hyp.target_pathway: "restored"}
+            )
+
+            # Mediation: How much effect goes through this pathway?
+            mediation = CausalEffectEstimator(self.causal_model, self.do_engine).mediation_analysis(
+                treatment=hyp.disrupted_gene,
+                outcome="asd_phenotype",
+                mediator=hyp.target_pathway
+            )
+
+            validated.append(CausallyValidatedHypothesis(
+                hypothesis=hyp,
+                intervention_effect=intervention_effect,
+                mediation_result=mediation,
+                causal_confidence=self.compute_causal_confidence(mediation)
+            ))
+
+        return CausalValidation(validated_hypotheses=validated)
+
+# pipelines/causal_analysis.py (~200 lines)
+
+class CausalAnalysisPipeline:
+    """
+    Standalone pipeline for causal queries on individual cases.
+    """
+
+    def __init__(self, config: PipelineConfig):
+        self.scm = StructuralCausalModel.from_knowledge_graph(config.kg)
+        self.do_engine = DoCalculusEngine(self.scm)
+        self.cf_engine = CounterfactualEngine(self.scm)
+        self.effect_estimator = CausalEffectEstimator(self.scm, self.do_engine)
+
+    def analyze_individual(self, individual_data: IndividualData) -> CausalReport:
+        """
+        Generate causal analysis report for an individual.
+
+        Includes:
+        - Key disrupted pathways with causal effect estimates
+        - Counterfactual analysis: "What if key genes were intact?"
+        - Mediation analysis: Which pathways mediate variant effects?
+        """
+
+    def compare_subtypes_causally(self,
+                                   subtype_profiles: List[SubtypeProfile]) -> SubtypeCausalComparison:
+        """
+        Compare subtypes using causal metrics.
+
+        - Which pathways have strongest causal effects per subtype?
+        - Do different subtypes have different causal mechanisms?
+        """
 ```
 
 ---
@@ -1000,20 +1850,35 @@ Module 01 (Data Loaders)
     ├──→ Module 02 (Variant Processing)
     │         │
     │         └──→ Module 07 (Pathway Scoring) ──→ Module 08 (Clustering)
-    │
-    └──→ Module 03 (Knowledge Graph)
-              │
-              ├──→ Module 04 (Graph Embeddings)
-              │         │
+    │                     │
+    │                     └──────────────────────────────┐
+    │                                                    │
+    └──→ Module 03 (Knowledge Graph)                     │
+              │                                          │
+              ├──→ Module 04 (Graph Embeddings)          │
+              │         │                                │
               │         └──→ Module 06 (Ontology GNN) ──→ Module 10 (Neuro-Symbolic)
               │                                                   │
               │                                                   │
               └──→ Module 05 (Pretrained Embeddings) ────────────┘
-                                                                  │
-                                                    Module 09 (Symbolic Rules)
-                                                                  │
+                        │                                         │
+                        │ (fine-tuning uses Module 01 expr data)  │
+                        │                                         │
+                        │                           Module 09 (Symbolic Rules)
+                        │                                  │      │
+                        │                                  │      │
+                        │                                  ▼      │
+                        │                     Module 11 (Therapeutic Hypotheses)
+                        │                                         │
+                        │                                         │
+                        └────────────────────────────────────────►│
                                                                   ▼
-                                                    Module 11 (Therapeutic Hypotheses)
+                                              Module 12 (Causal Inference)
+                                              ────────────────────────────
+                                              • Structural Causal Model
+                                              • do-calculus queries
+                                              • Counterfactual reasoning
+                                              • Mediation analysis
 ```
 
 ### Parallel Implementation Opportunities
@@ -1022,6 +1887,7 @@ These module pairs can be implemented simultaneously:
 - Module 04 + Module 05 (both produce embeddings)
 - Module 07 + Module 09 (independent of each other)
 - Module 08 + Module 11 (both consume pathway scores)
+- Module 10 + Module 12 (both are advanced reasoning modules)
 
 ---
 
@@ -1078,13 +1944,24 @@ This allows rollback if integration issues arise.
 | Phase | Modules | Sessions | Dependencies |
 |-------|---------|----------|--------------|
 | 1: Data Foundation | 01-02 | 2 | External data only |
-| 2: Knowledge Representation | 03-05 | 3 | Phase 1 |
+| 2: Knowledge Representation | 03-05 | 3-4 | Phase 1 |
 | 3: Neural Models | 06-08 | 4 | Phase 2 |
 | 4: Symbolic Reasoning | 09-11 | 3 | Phase 3 |
+| 5: Causal Inference | 12 | 2 | Phase 3, Phase 4 |
 | Integration | Pipelines | 2 | All modules |
-| **Total** | **11 modules** | **14 sessions** | |
+| **Total** | **12 modules** | **16-17 sessions** | |
 
 Each session is designed to be completable in 1-2 hours with focused context, producing a tested, documented module ready for integration.
+
+### New Capabilities Summary
+
+| Enhancement | Module | Capability Added |
+|-------------|--------|------------------|
+| Developmental context | 01 | BrainSpan expression, single-cell atlas loading |
+| Gene constraints | 01 | gnomAD pLI/LOEUF, SFARI gene scores |
+| Foundation model fine-tuning | 05 | Autism-specific fine-tuning, variant-aware embeddings |
+| Autism-specific rules | 09 | R1-R6 biological rules with full explanations |
+| Causal reasoning | 12 | do-calculus, counterfactuals, mediation analysis |
 
 ---
 
