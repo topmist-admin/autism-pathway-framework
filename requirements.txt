@@ -1,0 +1,83 @@
+# Autism Pathway Framework - Dependencies
+# Install: pip install -r requirements.txt
+
+# =============================================================================
+# Core Data Science
+# =============================================================================
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+
+# =============================================================================
+# Bioinformatics
+# =============================================================================
+pysam>=0.21.0              # VCF/BAM file handling
+pyvcf3>=1.0.3              # VCF parsing (alternative)
+biopython>=1.81            # Biological sequence analysis
+
+# =============================================================================
+# Graph & Network Analysis
+# =============================================================================
+networkx>=3.1              # Graph construction and algorithms
+igraph>=0.10.0             # Fast graph algorithms
+
+# =============================================================================
+# File Formats
+# =============================================================================
+pyarrow>=12.0.0            # Parquet files
+h5py>=3.9.0                # HDF5 files
+anndata>=0.9.0             # Single-cell data format (.h5ad)
+obonet>=1.0.0              # Gene Ontology OBO parsing
+
+# =============================================================================
+# Visualization
+# =============================================================================
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.15.0
+
+# =============================================================================
+# Testing
+# =============================================================================
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.0
+
+# =============================================================================
+# Development Tools
+# =============================================================================
+black>=23.0.0              # Code formatting
+ruff>=0.0.280              # Fast linting
+mypy>=1.4.0                # Type checking
+ipython>=8.14.0            # Interactive shell
+jupyter>=1.0.0             # Notebooks
+
+# =============================================================================
+# Google Cloud (for production deployment)
+# =============================================================================
+google-cloud-storage>=2.10.0
+google-cloud-aiplatform>=1.28.0
+google-cloud-bigquery>=3.11.0
+
+# =============================================================================
+# Configuration & CLI
+# =============================================================================
+pyyaml>=6.0
+python-dotenv>=1.0.0
+click>=8.1.0               # CLI framework
+rich>=13.0.0               # Beautiful terminal output
+tqdm>=4.65.0               # Progress bars
+
+# =============================================================================
+# Deep Learning (install separately if needed for GPU)
+# =============================================================================
+# torch>=2.0.0             # PyTorch - install via pytorch.org for CUDA support
+# dgl>=1.1.0               # Deep Graph Library
+# torch-geometric>=2.3.0   # PyTorch Geometric
+
+# =============================================================================
+# Foundation Models (install separately - large downloads)
+# =============================================================================
+# transformers>=4.30.0     # Hugging Face transformers
+# accelerate>=0.20.0       # Training acceleration
