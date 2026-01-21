@@ -1,0 +1,122 @@
+# =============================================================================
+# GCP Configuration for Autism Pathway Framework
+# =============================================================================
+# This file contains Google Cloud Platform configuration for data storage
+# and processing. Uses Application Default Credentials (ADC) for authentication.
+#
+# To set up ADC, run:
+#   gcloud auth application-default login --project=autism-pathway-framework
+# =============================================================================
+
+# Project settings
+gcp:
+  project_id: "autism-pathway-framework"
+  region: "us-central1"
+
+# Google Cloud Storage
+storage:
+  bucket: "autism-pathway-data"
+  paths:
+    raw: "raw/"
+    processed: "processed/"
+    embeddings: "embeddings/"
+    models: "models/"
+
+# BigQuery
+bigquery:
+  dataset: "autism_genetics"
+  location: "US"
+  tables:
+    string_ppi: "string_ppi"
+    gnomad_constraints: "gnomad_constraints"
+
+# Data file locations in GCS
+data_sources:
+  # Gene Ontology
+  go_ontology:
+    gcs_path: "gs://autism-pathway-data/raw/go-basic.obo"
+    format: "obo"
+    description: "Gene Ontology structure (terms and relationships)"
+
+  go_annotations:
+    gcs_path: "gs://autism-pathway-data/raw/goa_human.gaf"
+    format: "gaf"
+    description: "Human gene-to-GO term annotations"
+
+  # Pathways
+  reactome_pathways:
+    gcs_path: "gs://autism-pathway-data/raw/ReactomePathways.gmt"
+    format: "gmt"
+    description: "Reactome pathway definitions"
+
+  # Gene constraints (also in BigQuery)
+  gnomad_constraints:
+    gcs_path: "gs://autism-pathway-data/raw/gnomad_constraints.txt"
+    bigquery_table: "autism-pathway-framework.autism_genetics.gnomad_constraints"
+    format: "tsv"
+    description: "gnomAD v2.1.1 gene constraint scores (pLI, LOEUF, mis_z)"
+    key_columns:
+      - gene
+      - pLI
+      - oe_lof_upper  # LOEUF
+      - mis_z
+
+  # SFARI genes
+  sfari_genes:
+    gcs_path: "gs://autism-pathway-data/raw/SFARI-Gene_genes.csv"
+    format: "csv"
+    description: "SFARI autism gene database with confidence scores"
+    key_columns:
+      - gene-symbol
+      - gene-score
+      - syndromic
+
+  # BrainSpan expression
+  brainspan:
+    gcs_path: "gs://autism-pathway-data/raw/brainspan/"
+    format: "csv"
+    description: "BrainSpan developmental transcriptome (RNA-Seq Gencode v10)"
+    files:
+      expression_matrix: "brainspan/genes_matrix_csv/expression_matrix.csv"
+      columns_metadata: "brainspan/genes_matrix_csv/columns_metadata.csv"
+      rows_metadata: "brainspan/genes_matrix_csv/rows_metadata.csv"
+
+  # STRING PPI (in BigQuery for efficient querying)
+  string_ppi:
+    gcs_path: "gs://autism-pathway-data/raw/9606.protein.links.v12.0.txt"
+    bigquery_table: "autism-pathway-framework.autism_genetics.string_ppi"
+    format: "tsv"
+    description: "STRING v12.0 human protein-protein interactions"
+    row_count: 13715404
+    columns:
+      - protein1
+      - protein2
+      - combined_score
+
+# Local cache settings (for downloaded files)
+local_cache:
+  enabled: true
+  path: "data/cache/"
+  max_size_gb: 5
+
+# Query templates for BigQuery
+queries:
+  # Get constraint scores for a list of genes
+  gene_constraints: |
+    SELECT gene, pLI, oe_lof_upper as LOEUF, mis_z
+    FROM `autism-pathway-framework.autism_genetics.gnomad_constraints`
+    WHERE gene IN UNNEST(@gene_list)
+
+  # Get PPI interactions for a gene
+  gene_interactions: |
+    SELECT protein1, protein2, combined_score
+    FROM `autism-pathway-framework.autism_genetics.string_ppi`
+    WHERE protein1 LIKE CONCAT('%', @gene, '%')
+       OR protein2 LIKE CONCAT('%', @gene, '%')
+    AND combined_score >= @min_score
+
+  # Get high-confidence interactions (score >= 700)
+  high_confidence_ppi: |
+    SELECT protein1, protein2, combined_score
+    FROM `autism-pathway-framework.autism_genetics.string_ppi`
+    WHERE combined_score >= 700

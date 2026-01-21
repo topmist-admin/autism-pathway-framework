@@ -8,7 +8,7 @@
 |--------|------|-------|--------|------------|
 | 01 | Data Loaders | 1A | ✅ Complete | 100% |
 | 02 | Variant Processing | 1B | ✅ Complete | 100% |
-| 03 | Knowledge Graph | 2A | 🔲 Not Started | 0% |
+| 03 | Knowledge Graph | 2A | ✅ Complete | 100% |
 | 04 | Graph Embeddings | 2B | 🔲 Not Started | 0% |
 | 05 | Pretrained Embeddings | 2C | 🔲 Not Started | 0% |
 | 06 | Ontology GNN | 3A | 🔲 Not Started | 0% |
