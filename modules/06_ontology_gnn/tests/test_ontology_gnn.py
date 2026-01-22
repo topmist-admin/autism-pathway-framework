@@ -474,8 +474,9 @@ class TestGraphData:
 
 
 class TestNumpyFallback:
-    """Tests for numpy fallback implementations."""
+    """Tests for numpy fallback implementations (only run when PyTorch unavailable)."""
 
+    @pytest.mark.skipif(HAS_TORCH, reason="Fallback tests only run without PyTorch")
     def test_fallback_edge_transform(self):
         """Test EdgeTypeTransform fallback."""
         transform = EdgeTypeTransform(
@@ -485,6 +486,7 @@ class TestNumpyFallback:
         out = transform.forward(x, "ppi")
         assert out.shape == (10, 32)
 
+    @pytest.mark.skipif(HAS_TORCH, reason="Fallback tests only run without PyTorch")
     def test_fallback_message_passing(self):
         """Test MessagePassingLayer fallback."""
         layer = MessagePassingLayer(
@@ -496,6 +498,7 @@ class TestNumpyFallback:
         out = layer.forward(x, edge_index, edge_type, ["ppi"])
         assert out.shape[0] == 20
 
+    @pytest.mark.skipif(HAS_TORCH, reason="Fallback tests only run without PyTorch")
     def test_fallback_biological_attention(self):
         """Test BiologicalAttention fallback."""
         attn = BiologicalAttention(hidden_dim=64, num_heads=8)
@@ -503,6 +506,7 @@ class TestNumpyFallback:
         out, weights = attn.forward(x, x, x)
         assert out.shape == x.shape
 
+    @pytest.mark.skipif(HAS_TORCH, reason="Fallback tests only run without PyTorch")
     def test_fallback_ontology_gnn(self):
         """Test OntologyAwareGNN fallback."""
         config = GNNConfig(input_dim=64, hidden_dim=64, output_dim=32)
