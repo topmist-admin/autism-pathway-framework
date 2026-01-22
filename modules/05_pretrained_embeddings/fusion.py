@@ -323,33 +323,43 @@ class EmbeddingFusion:
         """
         MLP-based learned fusion.
 
-        Note: For actual training, this would need labels.
-        Here we use random weights as a placeholder.
+        WARNING: This uses RANDOM WEIGHTS unless fit_learned() has been called.
+        For most use cases, 'concat' or 'pca' fusion is recommended instead.
+
+        The random weights provide a non-linear transformation but won't capture
+        meaningful relationships between embedding sources. If you need learned
+        fusion, implement fit_learned() following the guide in its docstring.
         """
-        # Concatenate first
+        # Concatenate all embeddings first
         concat = self._fuse_concat(aligned_embeddings)
         input_dim = concat.shape[1]
 
         # Determine output dimension
         output_dim = self.config.output_dim or input_dim // 2
 
-        # Build simple MLP (in practice, this would be trained)
-        hidden_dims = self.config.hidden_dims
+        # Check if we have trained weights (from fit_learned)
+        if hasattr(self, '_learned_weights') and self._learned_weights:
+            # Use trained weights
+            W1 = self._learned_weights['W1']
+            b1 = self._learned_weights['b1']
+            W2 = self._learned_weights['W2']
+            b2 = self._learned_weights['b2']
+            logger.info("Using trained fusion weights.")
+        else:
+            # Use random weights (Xavier initialization) - NOT RECOMMENDED
+            hidden_dims = self.config.hidden_dims
+            W1 = np.random.randn(input_dim, hidden_dims[0]) / np.sqrt(input_dim)
+            b1 = np.zeros(hidden_dims[0])
+            W2 = np.random.randn(hidden_dims[0], output_dim) / np.sqrt(hidden_dims[0])
+            b2 = np.zeros(output_dim)
+            logger.warning(
+                "Learned fusion using RANDOM weights (not trained). "
+                "Consider using 'concat' or 'pca' fusion instead."
+            )
 
-        # Initialize weights (Xavier initialization)
-        W1 = np.random.randn(input_dim, hidden_dims[0]) / np.sqrt(input_dim)
-        b1 = np.zeros(hidden_dims[0])
-        W2 = np.random.randn(hidden_dims[0], output_dim) / np.sqrt(hidden_dims[0])
-        b2 = np.zeros(output_dim)
-
-        # Forward pass
-        hidden = np.maximum(0, concat @ W1 + b1)  # ReLU
+        # Forward pass through MLP
+        hidden = np.maximum(0, concat @ W1 + b1)  # ReLU activation
         output = hidden @ W2 + b2
-
-        logger.warning(
-            "Learned fusion using random weights. "
-            "For actual learned fusion, train with fit_learned() method."
-        )
 
         return output
 
@@ -368,17 +378,78 @@ class EmbeddingFusion:
         """
         Train learned fusion weights using labels.
 
+        NOTE: This method is NOT IMPLEMENTED. For most use cases in this project,
+        the OntologyAwareGNN (Module 06) learns to use fused embeddings, making
+        supervised fusion training redundant. Use 'concat' or 'pca' fusion instead.
+
+        If you need to implement this, here's the approach:
+
+        Implementation Guide:
+        ---------------------
+        1. Align embeddings to common node set (use align_embeddings())
+        2. Concatenate aligned embeddings as MLP input
+        3. Define MLP architecture:
+           - Input: concatenated embeddings (sum of all embedding dims)
+           - Hidden: config.hidden_dims (default [256, 128])
+           - Output: config.output_dim
+        4. Training loop:
+           - Forward pass through MLP
+           - Compute loss (CrossEntropyLoss for classification)
+           - Backprop and update weights
+        5. Store trained weights in self._learned_weights
+
+        Example PyTorch implementation:
+        ```python
+        import torch
+        import torch.nn as nn
+
+        # 1. Prepare data
+        aligned = align_embeddings(embeddings)
+        X = np.concatenate([aligned[k] for k in sorted(aligned.keys())], axis=1)
+        X_tensor = torch.tensor(X, dtype=torch.float32)
+        y_tensor = torch.tensor(labels, dtype=torch.long)
+
+        # 2. Define MLP
+        input_dim = X.shape[1]
+        mlp = nn.Sequential(
+            nn.Linear(input_dim, self.config.hidden_dims[0]),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(self.config.hidden_dims[0], self.config.output_dim),
+        )
+
+        # 3. Train
+        optimizer = torch.optim.Adam(mlp.parameters(), lr=learning_rate)
+        criterion = nn.CrossEntropyLoss()
+
+        for epoch in range(epochs):
+            optimizer.zero_grad()
+            outputs = mlp(X_tensor)
+            loss = criterion(outputs, y_tensor)
+            loss.backward()
+            optimizer.step()
+
+        # 4. Store weights for _fuse_learned() to use
+        self._learned_weights = {
+            'W1': mlp[0].weight.detach().numpy().T,
+            'b1': mlp[0].bias.detach().numpy(),
+            'W2': mlp[3].weight.detach().numpy().T,
+            'b2': mlp[3].bias.detach().numpy(),
+        }
+        ```
+
         Args:
-            embeddings: Source embeddings
-            labels: Target labels for supervised training
-            epochs: Training epochs
-            learning_rate: Learning rate
+            embeddings: Source embeddings from different extractors
+            labels: Target labels for supervised training (e.g., autism gene labels)
+            epochs: Number of training epochs
+            learning_rate: Learning rate for optimizer
         """
-        # This would implement actual training
-        # For now, placeholder
+        # NOT IMPLEMENTED - See docstring for implementation guide
+        # For this project, the GNN handles learning, so this is optional
         logger.info(
-            "fit_learned() not fully implemented. "
-            "Using default random weights."
+            "fit_learned() not implemented. This is optional - the OntologyAwareGNN "
+            "in Module 06 will learn to use fused embeddings. Use 'concat' or 'pca' "
+            "fusion methods instead."
         )
 
 
