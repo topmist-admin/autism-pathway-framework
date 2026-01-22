@@ -1,83 +1,112 @@
 # Autism Pathway Framework - Dependencies
 # Install: pip install -r requirements.txt
+# Python version: 3.13+
 
 # =============================================================================
 # Core Data Science
 # =============================================================================
-numpy>=1.24.0
-pandas>=2.0.0
-scipy>=1.11.0
-scikit-learn>=1.3.0
+numpy==2.4.1
+pandas==2.3.3
+scipy==1.17.0
+scikit-learn==1.8.0
+joblib==1.5.3
 
 # =============================================================================
 # Bioinformatics
 # =============================================================================
-pysam>=0.21.0              # VCF/BAM file handling
-pyvcf3>=1.0.3              # VCF parsing (alternative)
-biopython>=1.81            # Biological sequence analysis
+pysam==0.23.3              # VCF/BAM file handling
+biopython==1.86            # Biological sequence analysis
+anndata==0.12.7            # Single-cell data format (.h5ad)
+obonet==1.1.1              # Gene Ontology OBO parsing
 
 # =============================================================================
 # Graph & Network Analysis
 # =============================================================================
-networkx>=3.1              # Graph construction and algorithms
-igraph>=0.10.0             # Fast graph algorithms
+networkx==3.6.1            # Graph construction and algorithms
 
 # =============================================================================
-# File Formats
+# Deep Learning - PyTorch
 # =============================================================================
-pyarrow>=12.0.0            # Parquet files
-h5py>=3.9.0                # HDF5 files
-anndata>=0.9.0             # Single-cell data format (.h5ad)
-obonet>=1.0.0              # Gene Ontology OBO parsing
+torch==2.10.0              # PyTorch (MPS/CUDA support)
+torchvision==0.25.0        # Vision utilities
+torchaudio==2.10.0         # Audio utilities
+sympy==1.14.0              # Symbolic math (torch dependency)
+mpmath==1.3.0              # Arbitrary precision math
+
+# =============================================================================
+# Foundation Models - Transformers
+# =============================================================================
+transformers==4.57.6       # HuggingFace transformers
+huggingface-hub==0.36.0    # Model hub access
+tokenizers==0.22.2         # Fast tokenization
+sentencepiece==0.2.1       # Tokenizer backend
+safetensors==0.7.0         # Safe tensor serialization
+hf-xet==1.2.0              # HuggingFace utilities
+
+# =============================================================================
+# File Formats & I/O
+# =============================================================================
+pyarrow==23.0.0            # Parquet files
+h5py==3.15.1               # HDF5 files
+lxml==6.0.2                # XML parsing
+PyYAML==6.0.3              # YAML config files
+python-pptx==1.0.2         # PowerPoint files
+xlsxwriter==3.2.9          # Excel files
+zarr==3.1.5                # Chunked array storage
+numcodecs==0.16.5          # Compression codecs
 
 # =============================================================================
 # Visualization
 # =============================================================================
-matplotlib>=3.7.0
-seaborn>=0.12.0
-plotly>=5.15.0
+matplotlib==3.10.8
+seaborn==0.13.2
+plotly==6.5.2
+pillow==12.1.1
 
 # =============================================================================
 # Testing
 # =============================================================================
-pytest>=7.4.0
-pytest-cov>=4.1.0
-pytest-mock>=3.11.0
+pytest==9.0.2
+pytest-cov==7.0.0
+coverage==7.13.1
 
 # =============================================================================
 # Development Tools
 # =============================================================================
-black>=23.0.0              # Code formatting
-ruff>=0.0.280              # Fast linting
-mypy>=1.4.0                # Type checking
-ipython>=8.14.0            # Interactive shell
-jupyter>=1.0.0             # Notebooks
+black==26.1.0              # Code formatting
+ruff==0.14.13              # Fast linting
+mypy==1.19.1               # Type checking
+ipython==9.9.0             # Interactive shell
 
 # =============================================================================
-# Google Cloud (for production deployment)
+# CLI & User Interface
 # =============================================================================
-google-cloud-storage>=2.10.0
-google-cloud-aiplatform>=1.28.0
-google-cloud-bigquery>=3.11.0
+click==8.3.1               # CLI framework
+rich==14.2.0               # Beautiful terminal output
+tqdm==4.67.1               # Progress bars
 
 # =============================================================================
-# Configuration & CLI
+# Networking & HTTP
 # =============================================================================
-pyyaml>=6.0
-python-dotenv>=1.0.0
-click>=8.1.0               # CLI framework
-rich>=13.0.0               # Beautiful terminal output
-tqdm>=4.65.0               # Progress bars
+requests==2.32.5
+urllib3==2.6.3
+certifi==2026.1.4
+charset-normalizer==3.4.4
+idna==3.11
 
 # =============================================================================
-# Deep Learning (install separately if needed for GPU)
+# Utilities
 # =============================================================================
-# torch>=2.0.0             # PyTorch - install via pytorch.org for CUDA support
-# dgl>=1.1.0               # Deep Graph Library
-# torch-geometric>=2.3.0   # PyTorch Geometric
-
-# =============================================================================
-# Foundation Models (install separately - large downloads)
-# =============================================================================
-# transformers>=4.30.0     # Hugging Face transformers
-# accelerate>=0.20.0       # Training acceleration
+filelock==3.20.3           # File locking
+fsspec==2026.1.0           # Filesystem abstraction
+Jinja2==3.1.6              # Templating
+MarkupSafe==3.0.3          # Safe strings
+packaging==25.0            # Version parsing
+python-dateutil==2.9.0.post0
+pytz==2025.2
+tzdata==2025.3
+six==1.17.0
+typing_extensions==4.15.0
+regex==2026.1.15
+natsort==8.4.0             # Natural sorting
+narwhals==2.15.0           # DataFrame compatibility
