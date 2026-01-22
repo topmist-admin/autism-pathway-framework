@@ -6,12 +6,14 @@
 |-------|-------------|--------|---------|
 | 1A | Data Foundation | ✅ Complete | 01 Data Loaders |
 | 1B | Variant Processing | ✅ Complete | 02 Variant Processing |
-| 2A | Pathway Scoring | 🔲 Not Started | 03 Pathway Scoring |
-| 2B | Network Integration | 🔲 Not Started | 04 Network Integration |
-| 3A | Biological Context | 🔲 Not Started | 05 Context Integration |
-| 3B | Subtype Discovery | 🔲 Not Started | 06 Clustering |
-| 4 | Reasoning Layer | 🔲 Not Started | 07-09 Reasoning, Causal, Reports |
-| 5 | Validation | 🔲 Not Started | 10-12 Validation, Testing |
+| 2A | Knowledge Graph | ✅ Complete | 03 Knowledge Graph |
+| 2B | Graph Embeddings | ✅ Complete | 04 Graph Embeddings (TransE, RotatE) |
+| 2C | Pretrained Embeddings | 🔲 Not Started | 05 Geneformer, ESM-2 |
+| 3A | Ontology GNN | 🔲 Not Started | 06 GNN Models |
+| 3B | Pathway Scoring | 🔲 Not Started | 07 Pathway Scoring |
+| 3C | Subtype Clustering | 🔲 Not Started | 08 Clustering |
+| 4 | Reasoning Layer | 🔲 Not Started | 09-11 Rules, Neurosymbolic, Hypotheses |
+| 5 | Causal Inference | 🔲 Not Started | 12 Causal Analysis |
 
 > See [Implementation Plan](implementation_plan.md) for detailed module status and development roadmap.
 
