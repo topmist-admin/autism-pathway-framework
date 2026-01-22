@@ -12,12 +12,25 @@ import logging
 import numpy as np
 
 # Import from local module
-from .annotation import (
-    AnnotatedVariant,
-    VariantConsequence,
-    ImpactLevel,
-    LOF_CONSEQUENCES,
-)
+import sys
+from pathlib import Path
+_module_root = Path(__file__).parent
+sys.path.insert(0, str(_module_root))
+
+try:
+    from .annotation import (
+        AnnotatedVariant,
+        VariantConsequence,
+        ImpactLevel,
+        LOF_CONSEQUENCES,
+    )
+except ImportError:
+    from annotation import (
+        AnnotatedVariant,
+        VariantConsequence,
+        ImpactLevel,
+        LOF_CONSEQUENCES,
+    )
 
 logger = logging.getLogger(__name__)
 

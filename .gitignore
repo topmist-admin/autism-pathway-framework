@@ -156,3 +156,8 @@ Desktop.ini
 # =============================================================================
 .gcloud/
 gcloud-service-key.json
+
+# Local files to ignore
+*.pptx
+*.zip
+credentials/

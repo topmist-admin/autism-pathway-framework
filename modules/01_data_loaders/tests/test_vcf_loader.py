@@ -5,9 +5,15 @@ Tests for VCF Loader
 import pytest
 import tempfile
 import os
+import sys
 from pathlib import Path
 
-from ..vcf_loader import VCFLoader, Variant, VariantDataset, ValidationReport
+# Add parent modules to path for imports
+_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(_root))
+sys.path.insert(0, str(_root / "modules" / "01_data_loaders"))
+
+from vcf_loader import VCFLoader, Variant, VariantDataset, ValidationReport
 
 
 class TestVariant:

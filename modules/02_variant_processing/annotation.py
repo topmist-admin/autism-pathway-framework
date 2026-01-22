@@ -13,8 +13,10 @@ import logging
 # Import from Module 01
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from modules.01_data_loaders import Variant, VariantDataset, GeneAnnotationDB
+_module_root = Path(__file__).parent.parent
+sys.path.insert(0, str(_module_root / "01_data_loaders"))
+from vcf_loader import Variant, VariantDataset
+from annotation_loader import GeneAnnotationDB
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,8 @@ class VariantConsequence(Enum):
 
     # High impact
     FRAMESHIFT = "frameshift_variant"
-    NONSENSE = "stop_gained"
+    STOP_GAINED = "stop_gained"
+    NONSENSE = "stop_gained"  # Alias for STOP_GAINED
     SPLICE_ACCEPTOR = "splice_acceptor_variant"
     SPLICE_DONOR = "splice_donor_variant"
     START_LOST = "start_lost"
@@ -92,10 +95,31 @@ CONSEQUENCE_IMPACT = {
 # Loss-of-function consequences
 LOF_CONSEQUENCES = {
     VariantConsequence.FRAMESHIFT,
-    VariantConsequence.NONSENSE,
+    VariantConsequence.STOP_GAINED,
     VariantConsequence.SPLICE_ACCEPTOR,
     VariantConsequence.SPLICE_DONOR,
     VariantConsequence.START_LOST,
+}
+
+# Missense consequences
+MISSENSE_CONSEQUENCES = {
+    VariantConsequence.MISSENSE,
+}
+
+
+# Coding consequences (affect protein sequence)
+CODING_CONSEQUENCES = {
+    VariantConsequence.FRAMESHIFT,
+    VariantConsequence.STOP_GAINED,
+    VariantConsequence.SPLICE_ACCEPTOR,
+    VariantConsequence.SPLICE_DONOR,
+    VariantConsequence.START_LOST,
+    VariantConsequence.STOP_LOST,
+    VariantConsequence.MISSENSE,
+    VariantConsequence.INFRAME_INSERTION,
+    VariantConsequence.INFRAME_DELETION,
+    VariantConsequence.PROTEIN_ALTERING,
+    VariantConsequence.SYNONYMOUS,
 }
 
 
@@ -106,6 +130,7 @@ class AnnotatedVariant:
     variant: Variant
     gene_id: Optional[str] = None
     gene_name: Optional[str] = None
+    gene_symbol: Optional[str] = None  # Alias for gene_name
     transcript_id: Optional[str] = None
     consequence: VariantConsequence = VariantConsequence.UNKNOWN
     impact: ImpactLevel = ImpactLevel.MODIFIER
@@ -125,8 +150,22 @@ class AnnotatedVariant:
 
     # Additional annotations
     is_canonical: bool = True
-    is_lof: bool = False
     lof_confidence: Optional[str] = None  # HC, LC for LOFTEE
+
+    @property
+    def is_lof(self) -> bool:
+        """Check if variant is loss-of-function based on consequence."""
+        return self.consequence in LOF_CONSEQUENCES
+
+    @property
+    def is_missense(self) -> bool:
+        """Check if variant is missense."""
+        return self.consequence in MISSENSE_CONSEQUENCES
+
+    @property
+    def is_coding(self) -> bool:
+        """Check if variant affects coding sequence."""
+        return self.consequence in CODING_CONSEQUENCES
 
     @property
     def is_damaging(self) -> bool:
@@ -213,21 +252,33 @@ class VariantAnnotator:
     def __init__(self):
         """Initialize variant annotator."""
         self._gene_db: Optional[GeneAnnotationDB] = None
+        self._vep_cache: Dict[str, Any] = {}
+        self._cadd_scores: Dict[str, float] = {}
+        self._gnomad_af: Dict[str, float] = {}
 
     def set_gene_database(self, gene_db: GeneAnnotationDB) -> None:
         """Set gene annotation database for coordinate-based lookup."""
         self._gene_db = gene_db
 
-    def annotate(
+    def _variant_key(self, variant: Variant) -> str:
+        """Generate a unique key for a variant."""
+        return f"{variant.chrom}:{variant.pos}:{variant.ref}>{variant.alt}"
+
+    def _parse_consequence(self, consequence_str: str) -> VariantConsequence:
+        """Parse a consequence string to VariantConsequence enum."""
+        consequence_lower = consequence_str.lower()
+        for pattern, consequence in self.CONSEQUENCE_MAP.items():
+            if pattern.lower() == consequence_lower:
+                return consequence
+        return VariantConsequence.UNKNOWN
+
+    def annotate_batch(
         self,
         variants: List[Variant],
         gene_db: Optional[GeneAnnotationDB] = None,
     ) -> List[AnnotatedVariant]:
         """
-        Annotate a list of variants.
-
-        Annotations are extracted from variant INFO fields if available,
-        otherwise minimal annotations are created.
+        Annotate a batch of variants (alias for annotate).
 
         Args:
             variants: List of variants to annotate
@@ -236,9 +287,35 @@ class VariantAnnotator:
         Returns:
             List of annotated variants
         """
+        return self.annotate(variants, gene_db)
+
+    def annotate(
+        self,
+        variants,
+        gene_db: Optional[GeneAnnotationDB] = None,
+    ):
+        """
+        Annotate a variant or list of variants.
+
+        Annotations are extracted from variant INFO fields if available,
+        otherwise minimal annotations are created.
+
+        Args:
+            variants: Single variant or list of variants to annotate
+            gene_db: Optional gene annotation database
+
+        Returns:
+            Single AnnotatedVariant if input was single variant,
+            List of AnnotatedVariant if input was list
+        """
         if gene_db is not None:
             self._gene_db = gene_db
 
+        # Handle single variant
+        if isinstance(variants, Variant):
+            return self._annotate_single(variants)
+
+        # Handle list of variants
         annotated = []
         for variant in variants:
             ann = self._annotate_single(variant)
@@ -293,7 +370,6 @@ class VariantAnnotator:
             polyphen_score=polyphen,
             gnomad_af=gnomad_af,
             gnomad_af_popmax=gnomad_popmax,
-            is_lof=is_lof,
             lof_confidence=lof_conf,
         )
 
@@ -352,6 +428,54 @@ class VariantAnnotator:
                 if val and val not in (".", "NA", ""):
                     return str(val)
         return None
+
+    def load_cadd_scores(self, cadd_file: Path) -> None:
+        """
+        Load CADD scores from a TSV file.
+
+        Args:
+            cadd_file: Path to CADD scores file
+        """
+        import csv
+
+        with open(cadd_file, "r") as f:
+            reader = csv.reader(f, delimiter="\t")
+            for row in reader:
+                if row[0].startswith("#"):
+                    continue
+                if len(row) >= 6:
+                    chrom, pos, ref, alt, raw_score, phred = row[:6]
+                    key = f"{chrom}:{pos}:{ref}>{alt}"
+                    try:
+                        self._cadd_scores[key] = float(phred)
+                    except ValueError:
+                        pass
+
+        logger.info(f"Loaded {len(self._cadd_scores)} CADD scores")
+
+    def load_gnomad_frequencies(self, gnomad_file: Path) -> None:
+        """
+        Load gnomAD allele frequencies from a TSV file.
+
+        Args:
+            gnomad_file: Path to gnomAD frequencies file
+        """
+        import csv
+
+        with open(gnomad_file, "r") as f:
+            reader = csv.reader(f, delimiter="\t")
+            for row in reader:
+                if row[0].startswith("#"):
+                    continue
+                if len(row) >= 5:
+                    chrom, pos, ref, alt, af = row[:5]
+                    key = f"{chrom}:{pos}:{ref}>{alt}"
+                    try:
+                        self._gnomad_af[key] = float(af)
+                    except ValueError:
+                        pass
+
+        logger.info(f"Loaded {len(self._gnomad_af)} gnomAD frequencies")
 
     def classify_impact(self, variant: AnnotatedVariant) -> str:
         """

@@ -12,8 +12,9 @@ import logging
 # Import from Module 01
 import sys
 from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from modules.01_data_loaders import Variant, VariantDataset
+_module_root = Path(__file__).parent.parent
+sys.path.insert(0, str(_module_root / "01_data_loaders"))
+from vcf_loader import Variant, VariantDataset
 
 logger = logging.getLogger(__name__)
 

@@ -5,8 +5,15 @@ Tests for Constraint Loader
 import pytest
 import tempfile
 import os
+import sys
+from pathlib import Path
 
-from ..constraint_loader import ConstraintLoader, GeneConstraints, SFARIGenes
+# Add parent modules to path for imports
+_root = Path(__file__).parent.parent.parent.parent
+sys.path.insert(0, str(_root))
+sys.path.insert(0, str(_root / "modules" / "01_data_loaders"))
+
+from constraint_loader import ConstraintLoader, GeneConstraints, SFARIGenes
 
 
 class TestGeneConstraints:
