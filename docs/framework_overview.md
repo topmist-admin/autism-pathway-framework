@@ -8,7 +8,7 @@
 | 1B | Variant Processing | ✅ Complete | 02 Variant Processing |
 | 2A | Knowledge Graph | ✅ Complete | 03 Knowledge Graph |
 | 2B | Graph Embeddings | ✅ Complete | 04 Graph Embeddings (TransE, RotatE) |
-| 2C | Pretrained Embeddings | 🔲 Not Started | 05 Geneformer, ESM-2 |
+| 2C | Pretrained Embeddings | ✅ Complete | 05 Geneformer, ESM-2, PubMedBERT |
 | 3A | Ontology GNN | 🔲 Not Started | 06 GNN Models |
 | 3B | Pathway Scoring | 🔲 Not Started | 07 Pathway Scoring |
 | 3C | Subtype Clustering | 🔲 Not Started | 08 Clustering |
