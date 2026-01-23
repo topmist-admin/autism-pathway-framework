@@ -186,3 +186,30 @@ Rules are backed by published research:
 - **R4**: SynGO synaptic ontology, single-cell expression atlases
 - **R5**: Paralog databases (Ensembl), expression data
 - **R6**: DrugBank, pathway-drug mappings
+
+## Integration with Pipelines
+
+This module is integrated into the framework's therapeutic hypothesis pipeline:
+
+### TherapeuticHypothesisPipeline
+
+Rules R1-R6 are automatically applied to each individual in the cohort:
+
+```python
+from pipelines import TherapeuticHypothesisPipeline, TherapeuticPipelineConfig, DataConfig
+
+config = TherapeuticPipelineConfig(
+    data=DataConfig(vcf_path="cohort.vcf.gz", pathway_gmt_path="reactome.gmt"),
+    therapeutic=TherapeuticConfig(enable_rules=True),  # Enable symbolic rules
+)
+pipeline = TherapeuticHypothesisPipeline(config)
+result = pipeline.run()
+
+# Access per-individual rule analysis
+for sample_id, analysis in result.individual_analyses.items():
+    print(f"{sample_id}: {analysis.n_rules_fired} rules fired")
+    for rule in analysis.fired_rules:
+        print(f"  - {rule.rule.name}: {rule.explanation}")
+```
+
+See [pipelines/README.md](../../pipelines/README.md) for complete pipeline documentation

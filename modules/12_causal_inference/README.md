@@ -185,6 +185,63 @@ This module enables researchers to:
 - Module 07: Pathway Scoring (for observed pathway states)
 - Module 09: Symbolic Rules (for biological constraints)
 
+## Integration with Pipelines
+
+This module is a core component of the framework's integration pipelines:
+
+### CausalAnalysisPipeline
+
+Standalone causal reasoning for individual case analysis:
+
+```python
+from pipelines import CausalAnalysisPipeline, CausalAnalysisConfig
+
+config = CausalAnalysisConfig(
+    sample_id="PATIENT_001",
+    variant_genes=["SHANK3", "CHD8", "SCN2A"],
+    disrupted_pathways=["synaptic_transmission", "chromatin_remodeling"],
+    gene_effects={"SHANK3": 0.8, "CHD8": 0.7},
+)
+
+pipeline = CausalAnalysisPipeline(config)
+result = pipeline.run()
+
+# Query specific interventions
+effect = pipeline.query_intervention("synaptic_transmission", "asd_phenotype")
+
+# Counterfactual analysis
+cf = pipeline.query_counterfactual(
+    factual={"SHANK3_function": 0.3},
+    counterfactual={"SHANK3_function": 1.0},
+    outcome="asd_phenotype",
+)
+
+# Mediation analysis
+mediation = pipeline.query_mediation("SHANK3_function", "asd_phenotype", "synaptic_transmission")
+```
+
+### TherapeuticHypothesisPipeline
+
+Uses causal inference to validate therapeutic hypotheses:
+
+```python
+from pipelines import TherapeuticHypothesisPipeline, TherapeuticPipelineConfig
+
+config = TherapeuticPipelineConfig(
+    data=DataConfig(vcf_path="cohort.vcf.gz", pathway_gmt_path="reactome.gmt"),
+    therapeutic=TherapeuticConfig(enable_causal_validation=True),
+)
+pipeline = TherapeuticHypothesisPipeline(config)
+result = pipeline.run()
+
+# View causally validated hypotheses
+for validation in result.causal_validations:
+    if validation.is_causally_supported:
+        print(f"{validation.hypothesis_id}: effect={validation.intervention_effect:.2f}")
+```
+
+See [pipelines/README.md](../../pipelines/README.md) for complete pipeline documentation.
+
 ## Testing
 
 ```bash

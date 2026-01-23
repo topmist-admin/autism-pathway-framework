@@ -2,7 +2,7 @@
 
 A comprehensive research framework for pathway- and network-based analysis of genetic heterogeneity in Autism Spectrum Disorder (ASD).
 
-> **Implementation Status**: All 12 core modules complete | Last Updated: January 2026
+> **Implementation Status**: FRAMEWORK COMPLETE - 12 modules + 3 integration pipelines | Last Updated: January 2026
 
 ---
 
@@ -23,6 +23,8 @@ This framework shifts the unit of analysis from **individual genes** to **biolog
 
 ## Module Status
 
+### Core Modules
+
 | Module | Name | Description | Status |
 |--------|------|-------------|--------|
 | 01 | Data Loaders | VCF, pathway, expression, constraint data loading | ✅ Complete |
@@ -33,10 +35,18 @@ This framework shifts the unit of analysis from **individual genes** to **biolog
 | 06 | Ontology GNN | Ontology-aware graph neural network | ✅ Complete |
 | 07 | Pathway Scoring | Multi-evidence pathway disruption scoring | ✅ Complete |
 | 08 | Subtype Clustering | GMM-based clustering with validation | ✅ Complete |
-| 09 | Symbolic Rules | Biological rule engine (R1-R6) | ✅ Complete |
+| 09 | Symbolic Rules | Biological rule engine (R1-R7) | ✅ Complete |
 | 10 | Neurosymbolic | GNN + symbolic rule integration | ✅ Complete |
 | 11 | Therapeutic Hypotheses | Drug-pathway mapping and ranking | ✅ Complete |
 | 12 | Causal Inference | SCM, do-calculus, counterfactuals | ✅ Complete |
+
+### Integration Pipelines
+
+| Pipeline | Description | Status |
+|----------|-------------|--------|
+| Subtype Discovery | End-to-end VCF → pathway scores → subtypes | ✅ Complete |
+| Therapeutic Hypothesis | Subtype discovery + rules + drug hypotheses + causal validation | ✅ Complete |
+| Causal Analysis | Standalone causal reasoning for individual cases | ✅ Complete |
 
 ---
 
@@ -62,6 +72,12 @@ autism-pathway-framework/
 │   ├── 10_neurosymbolic/     # GNN + rules integration
 │   ├── 11_therapeutic_hypotheses/ # Drug mapping + ranking
 │   └── 12_causal_inference/  # Causal reasoning framework
+│
+├── pipelines/                # End-to-end integration pipelines
+│   ├── subtype_discovery.py  # VCF → subtypes pipeline
+│   ├── therapeutic_hypothesis.py # Full therapeutic pipeline
+│   ├── causal_analysis.py    # Standalone causal reasoning
+│   └── tests/                # Pipeline tests
 │
 ├── docs/                     # Documentation
 │   ├── implementation_plan.md
@@ -185,42 +201,74 @@ python -m pytest modules/ -v
 
 ## Quick Start
 
+### Using Integration Pipelines (Recommended)
+
+```python
+# Subtype Discovery Pipeline: VCF → Pathway Scores → Subtypes
+from pipelines import SubtypeDiscoveryPipeline, PipelineConfig, DataConfig
+
+config = PipelineConfig(
+    data=DataConfig(
+        vcf_path="cohort.vcf.gz",
+        pathway_gmt_path="reactome.gmt",
+    ),
+)
+pipeline = SubtypeDiscoveryPipeline(config)
+result = pipeline.run()
+
+print(result.summary)
+print(f"Identified {result.n_subtypes} subtypes")
+
+# Therapeutic Hypothesis Pipeline: Subtypes + Rules + Drug Hypotheses
+from pipelines import TherapeuticHypothesisPipeline, TherapeuticPipelineConfig
+
+config = TherapeuticPipelineConfig(
+    data=DataConfig(vcf_path="cohort.vcf.gz", pathway_gmt_path="reactome.gmt"),
+)
+pipeline = TherapeuticHypothesisPipeline(config)
+result = pipeline.run()
+
+for hyp in result.ranking_result.top_hypotheses:
+    print(hyp.summary())
+
+# Causal Analysis Pipeline: Individual Case Analysis
+from pipelines import CausalAnalysisPipeline, CausalAnalysisConfig
+
+config = CausalAnalysisConfig(
+    sample_id="PATIENT_001",
+    variant_genes=["SHANK3", "CHD8"],
+    disrupted_pathways=["synaptic_transmission"],
+)
+pipeline = CausalAnalysisPipeline(config)
+result = pipeline.run()
+
+# Query interventions
+effect = pipeline.query_intervention("synaptic_transmission", "asd_phenotype")
+```
+
+### Using Individual Modules
+
 ```python
 # Example: Load variants and compute gene burdens
 from modules.01_data_loaders import VCFLoader
 from modules.02_variant_processing import QCFilter, GeneBurdenCalculator
 
-# Load variants
 loader = VCFLoader()
 variants = loader.load("variants.vcf.gz")
 
-# Apply QC
 qc = QCFilter()
 filtered = qc.filter_variants(variants)
 
-# Compute gene burdens
 calculator = GeneBurdenCalculator()
 burdens = calculator.compute(filtered)
 
-# Example: Build knowledge graph and compute embeddings
-from modules.03_knowledge_graph import KnowledgeGraph
-from modules.04_graph_embeddings import TransEModel
-
-kg = KnowledgeGraph()
-kg.load_pathways("reactome.gmt")
-kg.load_interactions("string.tsv")
-
-embeddings = TransEModel(kg).train()
-
-# Example: Run causal analysis
+# Example: Run causal analysis directly
 from modules.12_causal_inference import (
     StructuralCausalModel,
     DoCalculusEngine,
-    CausalEffectEstimator
 )
 
 scm = StructuralCausalModel()
-# ... build causal graph ...
 do_engine = DoCalculusEngine(scm)
 ate = do_engine.average_treatment_effect("SHANK3_function", "asd_phenotype")
 ```

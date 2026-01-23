@@ -265,3 +265,50 @@ The module efficiently handles sparse gene burden matrices (most genes have zero
 - Only iterating over non-zero entries
 - Using sparse matrix operations for network propagation
 - Tracking only non-zero pathway scores
+
+## Integration with Pipelines
+
+This module is used by all framework integration pipelines:
+
+### SubtypeDiscoveryPipeline
+
+Pathway scoring is automatically performed as part of the subtype discovery workflow:
+
+```python
+from pipelines import SubtypeDiscoveryPipeline, PipelineConfig, DataConfig, PathwayScoringConfig
+
+config = PipelineConfig(
+    data=DataConfig(vcf_path="cohort.vcf.gz", pathway_gmt_path="reactome.gmt"),
+    pathway_scoring=PathwayScoringConfig(
+        aggregation_method=AggregationMethod.WEIGHTED_SUM,
+        use_network_propagation=True,
+        restart_prob=0.5,
+        normalization_method=NormalizationMethod.ZSCORE,
+    ),
+)
+pipeline = SubtypeDiscoveryPipeline(config)
+result = pipeline.run()
+
+# Access pathway scores
+pathway_df = result.pathway_scores.to_dataframe()
+```
+
+### TherapeuticHypothesisPipeline
+
+Extends subtype discovery and uses pathway scores to generate therapeutic hypotheses:
+
+```python
+from pipelines import TherapeuticHypothesisPipeline, TherapeuticPipelineConfig
+
+config = TherapeuticPipelineConfig(
+    data=DataConfig(vcf_path="cohort.vcf.gz", pathway_gmt_path="reactome.gmt"),
+)
+pipeline = TherapeuticHypothesisPipeline(config)
+result = pipeline.run()
+
+# Pathway scores are available through the subtype result
+for profile in result.subtype_result.subtype_profiles:
+    print(f"Subtype {profile.subtype_id} top pathways: {profile.top_pathways[:3]}")
+```
+
+See [pipelines/README.md](../../pipelines/README.md) for complete pipeline documentation

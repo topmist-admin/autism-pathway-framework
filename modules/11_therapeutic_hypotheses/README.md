@@ -211,3 +211,46 @@ source autismenv/bin/activate && python3 -m pytest modules/11_therapeutic_hypoth
     ├── test_evidence.py
     └── test_ranking.py
 ```
+
+## Integration with Pipelines
+
+This module is a core component of the TherapeuticHypothesisPipeline:
+
+```python
+from pipelines import (
+    TherapeuticHypothesisPipeline,
+    TherapeuticPipelineConfig,
+    TherapeuticConfig,
+    DataConfig,
+)
+
+config = TherapeuticPipelineConfig(
+    data=DataConfig(vcf_path="cohort.vcf.gz", pathway_gmt_path="reactome.gmt"),
+    therapeutic=TherapeuticConfig(
+        enable_rules=True,
+        enable_causal_validation=True,
+        min_pathway_zscore=1.5,
+        max_hypotheses=50,
+    ),
+)
+
+pipeline = TherapeuticHypothesisPipeline(config)
+result = pipeline.run()
+
+# Access ranked hypotheses
+for hyp in result.ranking_result.top_hypotheses[:5]:
+    print(hyp.summary())
+
+# Access subtype-specific hypotheses
+for subtype_id, hypotheses in result.subtype_hypotheses_map.items():
+    print(f"Subtype {subtype_id}: {len(hypotheses)} hypotheses")
+```
+
+The pipeline automatically:
+1. Runs subtype discovery (from VCF → pathway scores → clusters)
+2. Applies symbolic rules (R1-R6) to each individual
+3. Generates therapeutic hypotheses from disrupted pathways
+4. Ranks hypotheses by evidence score
+5. Validates hypotheses with causal inference (optional)
+
+See [pipelines/README.md](../../pipelines/README.md) for complete pipeline documentation

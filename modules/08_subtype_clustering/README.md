@@ -320,3 +320,45 @@ Consider:
 1. Excluding unstable samples from subtype-specific analyses
 2. Using soft cluster assignments for these samples
 3. Creating an "unclassified" category for very unstable samples
+
+## Integration with Pipelines
+
+This module is a core component of the framework's integration pipelines:
+
+### SubtypeDiscoveryPipeline
+
+End-to-end pipeline from VCF to subtype identification:
+
+```python
+from pipelines import SubtypeDiscoveryPipeline, PipelineConfig, DataConfig
+
+config = PipelineConfig(
+    data=DataConfig(
+        vcf_path="cohort.vcf.gz",
+        pathway_gmt_path="reactome.gmt",
+    ),
+)
+pipeline = SubtypeDiscoveryPipeline(config)
+result = pipeline.run()
+
+# Access clustering results
+print(f"Identified {result.n_subtypes} subtypes")
+for profile in result.subtype_profiles:
+    print(f"  Subtype {profile.subtype_id}: {profile.n_samples} samples")
+```
+
+### TherapeuticHypothesisPipeline
+
+Extends subtype discovery with therapeutic hypothesis generation:
+
+```python
+from pipelines import TherapeuticHypothesisPipeline, TherapeuticPipelineConfig
+
+config = TherapeuticPipelineConfig(
+    data=DataConfig(vcf_path="cohort.vcf.gz", pathway_gmt_path="reactome.gmt"),
+)
+pipeline = TherapeuticHypothesisPipeline(config)
+result = pipeline.run()
+```
+
+See [pipelines/README.md](../../pipelines/README.md) for complete pipeline documentation
