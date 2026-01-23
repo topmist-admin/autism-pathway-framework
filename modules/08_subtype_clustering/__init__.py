@@ -36,6 +36,23 @@ from characterization import (
     SubtypeCharacterizer,
 )
 
+# Import validation and research integrity components
+from validation import (
+    # Confound analysis
+    ConfoundType,
+    ConfoundTestResult,
+    ConfoundReport,
+    ConfoundAnalyzerConfig,
+    ConfoundAnalyzer,
+    # Negative controls
+    PermutationResult,
+    NegativeControlReport,
+    NegativeControlConfig,
+    NegativeControlRunner,
+    # Provenance tracking
+    ProvenanceRecord,
+)
+
 __all__ = [
     # Clustering
     "ClusteringMethod",
@@ -51,4 +68,17 @@ __all__ = [
     "PathwaySignature",
     "SubtypeProfile",
     "SubtypeCharacterizer",
+    # Validation - Confound Analysis
+    "ConfoundType",
+    "ConfoundTestResult",
+    "ConfoundReport",
+    "ConfoundAnalyzerConfig",
+    "ConfoundAnalyzer",
+    # Validation - Negative Controls
+    "PermutationResult",
+    "NegativeControlReport",
+    "NegativeControlConfig",
+    "NegativeControlRunner",
+    # Validation - Provenance
+    "ProvenanceRecord",
 ]

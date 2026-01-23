@@ -120,6 +120,7 @@ autism-genetics-platform/
 │   │   ├── clustering.py              # GMM, spectral, hierarchical
 │   │   ├── stability.py               # Bootstrap stability
 │   │   ├── characterization.py        # Subtype profiles
+│   │   ├── validation.py              # Research integrity (confounds, negative controls, provenance)
 │   │   └── tests/
 │   │
 │   ├── 09_symbolic_rules/             # Phase 4A
@@ -725,6 +726,32 @@ class SubtypeProfile:
     size: int
     characteristic_pathways: List[Tuple[str, float]]
     mean_profile: Dict[str, float]
+
+# Research Integrity Validation (validation.py)
+class ConfoundAnalyzer:
+    def test_cluster_confound_alignment(
+        self, cluster_labels: np.ndarray,
+        confounds: Dict[str, np.ndarray]) -> ConfoundReport
+    def compute_confound_association(
+        self, cluster_labels: np.ndarray,
+        confound_values: np.ndarray) -> Tuple[float, float, float]
+
+class NegativeControlRunner:
+    def permutation_test(
+        self, data: np.ndarray, clusterer: SubtypeClusterer) -> PermutationResult
+    def random_geneset_baseline(
+        self, data: np.ndarray, clusterer: SubtypeClusterer) -> Dict[str, Any]
+    def run_full_negative_control(
+        self, data: np.ndarray, clusterer: SubtypeClusterer) -> NegativeControlReport
+
+@dataclass
+class ProvenanceRecord:
+    reference_genome: str
+    annotation_version: str
+    pathway_db_versions: Dict[str, str]
+    pipeline_version: str
+    timestamp: datetime
+    def validate_compatibility(self, other: 'ProvenanceRecord') -> Tuple[bool, List[str]]
 ```
 
 ---
@@ -1972,7 +1999,7 @@ This section documents how the framework addresses known limitations and failure
 
 | Limitation | Framework Mitigation | Module | Status |
 |------------|---------------------|--------|--------|
-| Clusters reflect cohort/ascertainment bias | `StabilityAnalyzer` provides bootstrap stability; confound testing recommended | 08 | ⚠️ Partial |
+| Clusters reflect cohort/ascertainment bias | `ConfoundAnalyzer` tests cluster-confound alignment (batch, site, ancestry, etc.) | 08 | ✅ Strong |
 | Subtypes unstable under resampling | `StabilityAnalyzer` computes ARI/NMI, identifies unstable samples, rates stability | 08 | ✅ Strong |
 | Pathway hits skewed by database bias | `PathwayLoader` supports multiple databases (GO, Reactome, KEGG) for cross-validation | 01 | ⚠️ Partial |
 | Signals are associational, not causal | `StructuralCausalModel`, `DoCalculusEngine`, `CounterfactualEngine` | 12 | 🔲 Planned |
@@ -1982,6 +2009,10 @@ This section documents how the framework addresses known limitations and failure
 - `StabilityResult.stability_rating` → qualitative assessment ("excellent" to "unstable")
 - `StabilityResult.get_unstable_samples()` → identifies samples to exclude from interpretation
 - `StabilityResult.is_stable` → programmatic gate (ARI > 0.8)
+- `ConfoundAnalyzer.test_cluster_confound_alignment()` → tests for batch/site/ancestry effects
+- `ConfoundReport.overall_risk` → risk level ("low"/"moderate"/"high")
+- `NegativeControlRunner.permutation_test()` → validates structure is significant
+- `ProvenanceRecord.validate_compatibility()` → ensures version consistency
 
 ### 2) Systems Biology Pathway Mapping Mitigations
 
@@ -2015,7 +2046,7 @@ This section documents how the framework addresses known limitations and failure
 
 | Limitation | Framework Mitigation | Module | Status |
 |------------|---------------------|--------|--------|
-| Artifacts of bias, missingness, batch | `QCFilter` for variant QC; no explicit artifact detection | 02 | ⚠️ Partial |
+| Artifacts of bias, missingness, batch | `QCFilter` + `NegativeControlRunner` (permutation tests, null detection) | 02, 08 | ✅ Strong |
 | Multiple testing inflation | FDR correction in `SubtypeCharacterizer._fdr_correction()` | 08 | ✅ Implemented |
 | Lacks temporal/causal context | Developmental expression; causal inference planned | 01, 12 | ⚠️ Partial |
 | Non-replicable across cohorts | Stability analysis; no cross-cohort framework | 08 | ⚠️ Partial |
@@ -2029,62 +2060,37 @@ This section documents how the framework addresses known limitations and failure
 
 | Guardrail | Implementation | Status |
 |-----------|---------------|--------|
-| **Pin versions and provenance** | Metadata dictionaries in data structures | ⚠️ Partial |
+| **Pin versions and provenance** | `ProvenanceRecord` tracks reference genome, annotation, pathway DB versions, dependencies | ✅ Implemented |
 | **Separate Signal/Hypothesis/Validation** | `ReasoningChain` separates observations from conclusions | 🔲 Planned |
 | **Simple models that survive harsh tests** | Multiple clustering methods for comparison | ✅ Supported |
 | **Never imply treatment readiness** | `TherapeuticHypothesis.requires_validation: True` | 🔲 Planned |
 
 ### Identified Gaps and Recommended Enhancements
 
-#### High Priority Enhancements
+#### High Priority Enhancements ✅ IMPLEMENTED
 
-**1. Confound Testing Module** (enhance Module 08)
-```python
-class ConfoundAnalyzer:
-    """Test if clusters align with known confounds."""
-    def test_cluster_confound_alignment(
-        self,
-        clustering_result: ClusteringResult,
-        confounds: Dict[str, np.ndarray],  # batch, site, ancestry PCs, sex, age
-    ) -> ConfoundReport
+All three high-priority research integrity enhancements have been implemented in `modules/08_subtype_clustering/validation.py`:
 
-    def compute_confound_association(
-        self,
-        labels: np.ndarray,
-        confound: np.ndarray,
-    ) -> float  # Chi-squared or ANOVA statistic
-```
+**1. Confound Testing Module** ✅ Implemented
+- `ConfoundAnalyzer` tests cluster-confound alignment for batch, site, ancestry, sex, age
+- Chi-squared tests for categorical confounds, Kruskal-Wallis for continuous
+- Effect size calculation (Cramer's V, eta-squared)
+- Automatic Bonferroni correction for multiple testing
+- Risk assessment and recommendations
 
-**2. Negative Control Framework** (enhance Module 07/08)
-```python
-class NegativeControlRunner:
-    """Validate that pipeline doesn't find structure in null data."""
-    def permutation_test(
-        self,
-        scores: PathwayScoreMatrix,
-        n_permutations: int = 1000,
-    ) -> PermutationResult
+**2. Negative Control Framework** ✅ Implemented
+- `NegativeControlRunner` validates pipeline doesn't find structure in null data
+- Permutation tests with configurable iterations
+- Random gene set baseline comparisons
+- Label shuffle tests
+- Full negative control reports with p-values and recommendations
 
-    def random_geneset_baseline(
-        self,
-        gene_burdens: GeneBurdenMatrix,
-        n_random_sets: int = 100,
-    ) -> BaselineResult
-```
-
-**3. Version Provenance Tracking** (cross-module)
-```python
-@dataclass
-class ProvenanceRecord:
-    """Track versions for reproducibility."""
-    reference_genome: str  # e.g., "GRCh38"
-    annotation_version: str  # e.g., "Ensembl 110"
-    pathway_db_versions: Dict[str, str]  # {"GO": "2024-01-01", "Reactome": "v85"}
-    pipeline_version: str
-    timestamp: datetime
-
-    def validate_compatibility(self, other: 'ProvenanceRecord') -> bool
-```
+**3. Version Provenance Tracking** ✅ Implemented
+- `ProvenanceRecord` tracks reference genome, annotation, pathway DB versions
+- Dependency version capture
+- Cohort and pipeline metadata
+- Compatibility validation between records
+- JSON serialization for reproducibility
 
 #### Medium Priority Enhancements
 
