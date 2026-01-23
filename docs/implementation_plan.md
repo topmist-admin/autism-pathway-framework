@@ -1964,6 +1964,174 @@ This allows rollback if integration issues arise.
 
 ---
 
+## Research Integrity: Limitations and Failure Mode Mitigation
+
+This section documents how the framework addresses known limitations and failure modes in AI-driven autism genetics research, based on analysis of common pitfalls across four research approaches.
+
+### 1) AI-Driven Genetic Subtyping Mitigations
+
+| Limitation | Framework Mitigation | Module | Status |
+|------------|---------------------|--------|--------|
+| Clusters reflect cohort/ascertainment bias | `StabilityAnalyzer` provides bootstrap stability; confound testing recommended | 08 | ⚠️ Partial |
+| Subtypes unstable under resampling | `StabilityAnalyzer` computes ARI/NMI, identifies unstable samples, rates stability | 08 | ✅ Strong |
+| Pathway hits skewed by database bias | `PathwayLoader` supports multiple databases (GO, Reactome, KEGG) for cross-validation | 01 | ⚠️ Partial |
+| Signals are associational, not causal | `StructuralCausalModel`, `DoCalculusEngine`, `CounterfactualEngine` | 12 | 🔲 Planned |
+| Limited developmental context | `ExpressionLoader` (BrainSpan), `SingleCellLoader` (cell-type context) | 01 | ✅ Strong |
+
+**Implemented Guardrails:**
+- `StabilityResult.stability_rating` → qualitative assessment ("excellent" to "unstable")
+- `StabilityResult.get_unstable_samples()` → identifies samples to exclude from interpretation
+- `StabilityResult.is_stable` → programmatic gate (ARI > 0.8)
+
+### 2) Systems Biology Pathway Mapping Mitigations
+
+| Limitation | Framework Mitigation | Module | Status |
+|------------|---------------------|--------|--------|
+| Incomplete/biased pathway databases | Multiple database support; `KnowledgeGraph` integrates multiple sources | 01, 03 | ⚠️ Partial |
+| Batch effects, tissue mismatch | `QCFilter` for variant QC; developmental expression context | 02, 01 | ⚠️ Partial |
+| Correlational, not causal mechanisms | `BiologicalRules` (R1-R6) for mechanistic reasoning; causal inference | 09, 12 | 🔲 Planned |
+| Small/heterogeneous datasets | No explicit sample size warnings | — | 🔲 Gap |
+| Functional impact is hypothesis-level | `FiredRule` includes `explanation`, `evidence`, `base_confidence` | 09 | 🔲 Planned |
+
+**Implemented Guardrails:**
+- `DevelopmentalExpression.get_prenatal_expression()` → prenatal cortex context
+- `SingleCellAtlas.get_cell_type_specific_genes()` → cell-type specificity
+- `PathwayScoreMatrix.contributing_genes` → transparency in pathway scoring
+
+### 3) Phenotype-Genotype Correlation Mitigations
+
+| Limitation | Framework Mitigation | Module | Status |
+|------------|---------------------|--------|--------|
+| Broad, noisy phenotypes | Framework is genetics-focused; phenotype handling minimal | — | 🔲 Gap |
+| Confounding (ancestry, site, age) | `GeneConstraints` provides population context (gnomAD) | 01 | ⚠️ Partial |
+| VUS uncertainty | Variant classification in annotation; no uncertainty propagation | 02 | ⚠️ Partial |
+| Cross-cohort replication | No built-in replication framework | — | 🔲 Gap |
+
+**Implemented Guardrails:**
+- `SubtypeCharacterizer` enables "mechanism-first" approach (subtype by pathway, then evaluate)
+- `SFARIGenes.scores` provides curated evidence levels (1-3)
+
+### 4) Data-Driven Hypothesis Generation Mitigations
+
+| Limitation | Framework Mitigation | Module | Status |
+|------------|---------------------|--------|--------|
+| Artifacts of bias, missingness, batch | `QCFilter` for variant QC; no explicit artifact detection | 02 | ⚠️ Partial |
+| Multiple testing inflation | FDR correction in `SubtypeCharacterizer._fdr_correction()` | 08 | ✅ Implemented |
+| Lacks temporal/causal context | Developmental expression; causal inference planned | 01, 12 | ⚠️ Partial |
+| Non-replicable across cohorts | Stability analysis; no cross-cohort framework | 08 | ⚠️ Partial |
+| Outputs are hypotheses, not conclusions | `FiredRule` with explanations; `TherapeuticHypothesis.requires_validation` | 09, 11 | 🔲 Planned |
+
+**Implemented Guardrails:**
+- `PathwaySignature` includes `p_value`, `effect_size`, `fold_change`
+- `CharacterizationConfig.use_fdr_correction` → automatic multiple testing correction
+
+### Cross-Cutting Guardrails
+
+| Guardrail | Implementation | Status |
+|-----------|---------------|--------|
+| **Pin versions and provenance** | Metadata dictionaries in data structures | ⚠️ Partial |
+| **Separate Signal/Hypothesis/Validation** | `ReasoningChain` separates observations from conclusions | 🔲 Planned |
+| **Simple models that survive harsh tests** | Multiple clustering methods for comparison | ✅ Supported |
+| **Never imply treatment readiness** | `TherapeuticHypothesis.requires_validation: True` | 🔲 Planned |
+
+### Identified Gaps and Recommended Enhancements
+
+#### High Priority Enhancements
+
+**1. Confound Testing Module** (enhance Module 08)
+```python
+class ConfoundAnalyzer:
+    """Test if clusters align with known confounds."""
+    def test_cluster_confound_alignment(
+        self,
+        clustering_result: ClusteringResult,
+        confounds: Dict[str, np.ndarray],  # batch, site, ancestry PCs, sex, age
+    ) -> ConfoundReport
+
+    def compute_confound_association(
+        self,
+        labels: np.ndarray,
+        confound: np.ndarray,
+    ) -> float  # Chi-squared or ANOVA statistic
+```
+
+**2. Negative Control Framework** (enhance Module 07/08)
+```python
+class NegativeControlRunner:
+    """Validate that pipeline doesn't find structure in null data."""
+    def permutation_test(
+        self,
+        scores: PathwayScoreMatrix,
+        n_permutations: int = 1000,
+    ) -> PermutationResult
+
+    def random_geneset_baseline(
+        self,
+        gene_burdens: GeneBurdenMatrix,
+        n_random_sets: int = 100,
+    ) -> BaselineResult
+```
+
+**3. Version Provenance Tracking** (cross-module)
+```python
+@dataclass
+class ProvenanceRecord:
+    """Track versions for reproducibility."""
+    reference_genome: str  # e.g., "GRCh38"
+    annotation_version: str  # e.g., "Ensembl 110"
+    pathway_db_versions: Dict[str, str]  # {"GO": "2024-01-01", "Reactome": "v85"}
+    pipeline_version: str
+    timestamp: datetime
+
+    def validate_compatibility(self, other: 'ProvenanceRecord') -> bool
+```
+
+#### Medium Priority Enhancements
+
+**4. Multi-Representation Agreement** (enhance Module 08)
+```python
+def require_multi_representation_agreement(
+    results: List[ClusteringResult],
+    min_agreement_ari: float = 0.7,
+) -> AgreementReport:
+    """Require subtypes to be consistent across feature representations."""
+```
+
+**5. Cross-Cohort Validation Framework** (new utility)
+```python
+class ReplicationValidator:
+    """Validate findings across independent cohorts."""
+    def validate_subtype_geometry(
+        self,
+        discovery: ClusteringResult,
+        replication: ClusteringResult,
+    ) -> GeometryValidation
+
+    def validate_pathway_themes(
+        self,
+        discovery: List[SubtypeProfile],
+        replication: List[SubtypeProfile],
+    ) -> ThemeValidation
+```
+
+### Coverage Summary by Research Approach
+
+| Research Approach | Framework Coverage | Primary Gaps |
+|------------------|-------------------|--------------|
+| AI-Driven Genetic Subtyping | **Strong** | Confound testing, multi-representation |
+| Systems Biology Pathway Mapping | **Moderate** | Batch/tissue mismatch warnings |
+| Phenotype-Genotype Correlation | **Weak** | Phenotype structures, confound modeling |
+| Data-Driven Hypothesis Generation | **Moderate** | Permutation/negative control framework |
+
+### Implementation Priority for Remaining Modules
+
+Given the gaps analysis, Module 09 (Symbolic Rules) and Module 12 (Causal Inference) are critical for addressing:
+- "Correlation vs causation" concerns
+- "Hypothesis not conclusion" discipline
+- Mechanistic reasoning with explicit evidence
+
+---
+
 ## Summary
 
 | Phase | Modules | Sessions | Dependencies |
