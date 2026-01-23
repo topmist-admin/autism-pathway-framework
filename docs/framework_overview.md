@@ -9,13 +9,15 @@
 | 2A | Knowledge Graph | ✅ Complete | 03 Knowledge Graph |
 | 2B | Graph Embeddings | ✅ Complete | 04 Graph Embeddings (TransE, RotatE) |
 | 2C | Pretrained Embeddings | ✅ Complete | 05 Geneformer, ESM-2, PubMedBERT |
-| 3A | Ontology GNN | 🔲 Not Started | 06 GNN Models |
-| 3B | Pathway Scoring | 🔲 Not Started | 07 Pathway Scoring |
-| 3C | Subtype Clustering | 🔲 Not Started | 08 Clustering |
-| 4 | Reasoning Layer | 🔲 Not Started | 09-11 Rules, Neurosymbolic, Hypotheses |
-| 5 | Causal Inference | 🔲 Not Started | 12 Causal Analysis |
+| 3A | Ontology GNN | ✅ Complete | 06 GNN Models |
+| 3B | Pathway Scoring | ✅ Complete | 07 Pathway Scoring |
+| 3C | Subtype Clustering | ✅ Complete | 08 Clustering |
+| 4A | Symbolic Rules | ✅ Complete | 09 Biological Rules (R1-R6) |
+| 4B | Neurosymbolic | ✅ Complete | 10 GNN + Rules Integration |
+| 4C | Therapeutic Hypotheses | ✅ Complete | 11 Drug Mapping + Ranking |
+| 5 | Causal Inference | ✅ Complete | 12 SCM, Do-Calculus, Counterfactuals |
 
-> See [Implementation Plan](implementation_plan.md) for detailed module status and development roadmap.
+> **All 12 core modules are complete!** See [Implementation Plan](implementation_plan.md) for development details.
 
 ---
 

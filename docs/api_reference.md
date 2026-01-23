@@ -774,8 +774,463 @@ class ImpactLevel(Enum):
 
 ---
 
+## Module 03: Knowledge Graph
+
+### KnowledgeGraph
+
+```python
+class KnowledgeGraph:
+    """Biological knowledge graph for gene-pathway-phenotype relationships."""
+
+    def add_node(self, node_id: str, node_type: str, **attributes) -> None:
+        """Add a node to the graph."""
+
+    def add_edge(self, source: str, target: str, relation: str, **attributes) -> None:
+        """Add a directed edge between nodes."""
+
+    def load_pathways(self, gmt_path: str) -> int:
+        """Load pathways from GMT file. Returns count of pathways loaded."""
+
+    def load_interactions(self, interactions_path: str) -> int:
+        """Load gene-gene interactions. Returns count of edges added."""
+
+    def get_subgraph(self, node_ids: List[str], max_hops: int = 1) -> 'KnowledgeGraph':
+        """Extract subgraph around specified nodes."""
+
+    def to_networkx(self) -> nx.DiGraph:
+        """Convert to NetworkX graph."""
+
+    def to_pyg(self) -> torch_geometric.data.HeteroData:
+        """Convert to PyTorch Geometric heterogeneous graph."""
+```
+
+---
+
+## Module 04: Graph Embeddings
+
+### TransEModel
+
+```python
+class TransEModel:
+    """TransE knowledge graph embedding model."""
+
+    def __init__(self, kg: KnowledgeGraph, embedding_dim: int = 128):
+        """Initialize TransE model."""
+
+    def train(self, epochs: int = 100, lr: float = 0.01) -> np.ndarray:
+        """Train embeddings. Returns entity embedding matrix."""
+
+    def get_embedding(self, entity_id: str) -> np.ndarray:
+        """Get embedding vector for an entity."""
+
+    def predict_link(self, head: str, relation: str, tail: str) -> float:
+        """Predict link probability."""
+```
+
+### RotatEModel
+
+```python
+class RotatEModel:
+    """RotatE knowledge graph embedding model (complex-valued)."""
+
+    def __init__(self, kg: KnowledgeGraph, embedding_dim: int = 128):
+        """Initialize RotatE model."""
+
+    def train(self, epochs: int = 100) -> np.ndarray:
+        """Train embeddings. Returns entity embedding matrix."""
+```
+
+---
+
+## Module 05: Pretrained Embeddings
+
+### GeneformerEmbedder
+
+```python
+class GeneformerEmbedder:
+    """Geneformer foundation model embeddings for genes."""
+
+    def __init__(self, model_path: Optional[str] = None):
+        """Initialize with optional pretrained model path."""
+
+    def embed_genes(self, gene_ids: List[str]) -> np.ndarray:
+        """Get embeddings for list of genes."""
+
+    def embed_expression_profile(self, expression: Dict[str, float]) -> np.ndarray:
+        """Embed an expression profile."""
+```
+
+### ESM2Embedder
+
+```python
+class ESM2Embedder:
+    """ESM-2 protein language model embeddings."""
+
+    def embed_sequence(self, sequence: str) -> np.ndarray:
+        """Get embedding for protein sequence."""
+
+    def embed_genes(self, gene_ids: List[str]) -> np.ndarray:
+        """Get embeddings via canonical protein sequences."""
+```
+
+---
+
+## Module 06: Ontology GNN
+
+### OntologyAwareGNN
+
+```python
+class OntologyAwareGNN(torch.nn.Module):
+    """Graph Neural Network respecting ontology hierarchy."""
+
+    def __init__(self, config: GNNConfig):
+        """Initialize with configuration."""
+
+    def forward(self, data: HeteroData) -> torch.Tensor:
+        """Forward pass through GNN layers."""
+
+    def predict_pathway_scores(self, gene_burdens: GeneBurdenMatrix) -> PathwayScores:
+        """Predict pathway disruption scores from gene burdens."""
+```
+
+### GNNConfig
+
+```python
+@dataclass
+class GNNConfig:
+    hidden_dim: int = 128
+    num_layers: int = 3
+    dropout: float = 0.1
+    aggregation: str = "mean"  # mean, sum, max
+    use_ontology_attention: bool = True
+```
+
+---
+
+## Module 07: Pathway Scoring
+
+### PathwayScorer
+
+```python
+class PathwayScorer:
+    """Multi-evidence pathway disruption scoring."""
+
+    def __init__(self, config: ScoringConfig):
+        """Initialize with scoring configuration."""
+
+    def score(
+        self,
+        gene_burdens: GeneBurdenMatrix,
+        context: Optional[BiologicalContext] = None
+    ) -> PathwayScores:
+        """Compute pathway disruption scores."""
+
+    def score_with_uncertainty(
+        self,
+        gene_burdens: GeneBurdenMatrix,
+        n_bootstrap: int = 100
+    ) -> Tuple[PathwayScores, np.ndarray]:
+        """Score with bootstrap confidence intervals."""
+```
+
+### PathwayScores
+
+```python
+@dataclass
+class PathwayScores:
+    samples: List[str]
+    pathways: List[str]
+    scores: np.ndarray  # (n_samples, n_pathways)
+    z_scores: np.ndarray  # Normalized scores
+
+    def get_top_pathways(self, sample: str, n: int = 10) -> List[Tuple[str, float]]:
+        """Get top disrupted pathways for a sample."""
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Convert to pandas DataFrame."""
+```
+
+---
+
+## Module 08: Subtype Clustering
+
+### SubtypeClusterer
+
+```python
+class SubtypeClusterer:
+    """GMM-based clustering with validation."""
+
+    def __init__(self, config: ClusterConfig):
+        """Initialize clusterer."""
+
+    def fit(self, pathway_scores: PathwayScores) -> ClusterResult:
+        """Fit clustering model."""
+
+    def predict(self, pathway_scores: PathwayScores) -> np.ndarray:
+        """Predict cluster assignments."""
+
+    def fit_predict(self, pathway_scores: PathwayScores) -> ClusterResult:
+        """Fit and predict in one step."""
+```
+
+### ClusterResult
+
+```python
+@dataclass
+class ClusterResult:
+    labels: np.ndarray
+    probabilities: np.ndarray  # Soft assignments
+    n_clusters: int
+    silhouette_score: float
+    stability_score: float
+    cluster_profiles: Dict[int, PathwayProfile]
+```
+
+---
+
+## Module 09: Symbolic Rules
+
+### RuleEngine
+
+```python
+class RuleEngine:
+    """Biological rule inference engine."""
+
+    def __init__(self, rules: List[BiologicalRule], context: BiologicalContext):
+        """Initialize with rules and biological context."""
+
+    def evaluate(self, gene_data: GeneData) -> List[RuleResult]:
+        """Evaluate all rules on gene data."""
+
+    def evaluate_sample(self, sample_id: str, burdens: GeneBurdenMatrix) -> List[RuleResult]:
+        """Evaluate rules for a specific sample."""
+```
+
+### BiologicalRule
+
+```python
+@dataclass
+class BiologicalRule:
+    rule_id: str  # R1, R2, etc.
+    name: str
+    condition: Callable[[GeneData, BiologicalContext], bool]
+    action: Callable[[GeneData], RuleOutput]
+    confidence: float
+    explanation_template: str
+```
+
+---
+
+## Module 10: Neurosymbolic
+
+### NeuroSymbolicModel
+
+```python
+class NeuroSymbolicModel:
+    """Combined GNN + symbolic rule model."""
+
+    def __init__(self, gnn: OntologyAwareGNN, rule_engine: RuleEngine, config: NSConfig):
+        """Initialize neurosymbolic model."""
+
+    def predict(self, data: HeteroData) -> NeuroSymbolicOutput:
+        """Combined prediction with neural and symbolic components."""
+
+    def explain(self, sample_id: str) -> Explanation:
+        """Generate explanation for prediction."""
+```
+
+### NeuroSymbolicOutput
+
+```python
+@dataclass
+class NeuroSymbolicOutput:
+    neural_scores: np.ndarray
+    symbolic_adjustments: np.ndarray
+    combined_scores: np.ndarray
+    fired_rules: List[RuleResult]
+    explanations: List[str]
+```
+
+---
+
+## Module 11: Therapeutic Hypotheses
+
+### PathwayDrugMapper
+
+```python
+class PathwayDrugMapper:
+    """Map disrupted pathways to drug candidates."""
+
+    def __init__(self, drug_db: DrugTargetDatabase, config: MapperConfig):
+        """Initialize mapper with drug database."""
+
+    def map(
+        self,
+        pathway_id: str,
+        pathway_genes: Optional[List[str]] = None,
+        disrupted_genes: Optional[List[str]] = None
+    ) -> List[DrugCandidate]:
+        """Map pathway to candidate drugs."""
+```
+
+### HypothesisRanker
+
+```python
+class HypothesisRanker:
+    """Rank therapeutic hypotheses with evidence scoring."""
+
+    def rank(
+        self,
+        hypotheses: List[TherapeuticHypothesis],
+        evidence_scorer: EvidenceScorer
+    ) -> RankingResult:
+        """Rank hypotheses by evidence and diversity."""
+```
+
+### TherapeuticHypothesis
+
+```python
+@dataclass
+class TherapeuticHypothesis:
+    hypothesis_id: str
+    drug: DrugCandidate
+    target_pathway: str
+    mechanism: str
+    evidence_score: EvidenceScore
+    requires_validation: bool = True  # Always True (safety)
+```
+
+---
+
+## Module 12: Causal Inference
+
+### StructuralCausalModel
+
+```python
+class StructuralCausalModel:
+    """Structural Causal Model for ASD genetics."""
+
+    def add_node(self, node: CausalNode) -> None:
+        """Add a causal node."""
+
+    def add_edge(self, edge: CausalEdge) -> None:
+        """Add a causal edge."""
+
+    def is_d_separated(self, x: str, y: str, conditioning: Set[str]) -> bool:
+        """Test d-separation."""
+
+    def get_backdoor_paths(self, treatment: str, outcome: str) -> List[List[str]]:
+        """Find backdoor paths."""
+
+    def get_valid_adjustment_sets(self, treatment: str, outcome: str) -> List[Set[str]]:
+        """Find valid adjustment sets."""
+```
+
+### DoCalculusEngine
+
+```python
+class DoCalculusEngine:
+    """Pearl's do-calculus for intervention reasoning."""
+
+    def __init__(self, scm: StructuralCausalModel):
+        """Initialize with SCM."""
+
+    def do(self, intervention: Dict[str, float]) -> IntervenedModel:
+        """Apply do-operator."""
+
+    def query(
+        self,
+        outcome: str,
+        intervention: Dict[str, float],
+        evidence: Optional[Dict[str, float]] = None
+    ) -> Distribution:
+        """Compute P(outcome | do(intervention), evidence)."""
+
+    def average_treatment_effect(
+        self,
+        treatment: str,
+        outcome: str,
+        treatment_values: Tuple[float, float] = (0.0, 1.0)
+    ) -> float:
+        """Compute ATE = E[Y|do(T=1)] - E[Y|do(T=0)]."""
+```
+
+### CounterfactualEngine
+
+```python
+class CounterfactualEngine:
+    """Counterfactual reasoning engine."""
+
+    def counterfactual(
+        self,
+        factual_evidence: Dict[str, float],
+        counterfactual_intervention: Dict[str, float],
+        query_variable: str
+    ) -> CounterfactualResult:
+        """Three-step counterfactual: abduction, action, prediction."""
+
+    def probability_of_necessity(
+        self,
+        treatment: str,
+        outcome: str,
+        factual: Dict[str, float]
+    ) -> float:
+        """P(Y_0=0 | T=1, Y=1) - was treatment necessary?"""
+
+    def probability_of_sufficiency(
+        self,
+        treatment: str,
+        outcome: str,
+        factual: Dict[str, float]
+    ) -> float:
+        """P(Y_1=1 | T=0, Y=0) - would treatment be sufficient?"""
+```
+
+### CausalEffectEstimator
+
+```python
+class CausalEffectEstimator:
+    """Estimate direct, indirect, and total causal effects."""
+
+    def total_effect(self, treatment: str, outcome: str) -> float:
+        """Total causal effect."""
+
+    def direct_effect(self, treatment: str, outcome: str, mediator: str) -> float:
+        """Natural Direct Effect (not through mediator)."""
+
+    def indirect_effect(self, treatment: str, outcome: str, mediator: str) -> float:
+        """Natural Indirect Effect (through mediator)."""
+
+    def mediation_analysis(
+        self,
+        treatment: str,
+        outcome: str,
+        mediator: str
+    ) -> MediationResult:
+        """Full mediation analysis with proportion mediated."""
+```
+
+### MediationResult
+
+```python
+@dataclass
+class MediationResult:
+    total_effect: float
+    direct_effect: float
+    indirect_effect: float
+    proportion_mediated: float
+    confidence_interval: Tuple[float, float]
+    treatment: str
+    outcome: str
+    mediator: str
+    explanation: str
+```
+
+---
+
 ## See Also
 
 - [Configuration Guide](configuration.md) - Parameter configuration
 - [Data Formats](data_formats.md) - File format specifications
 - [Testing Guide](testing.md) - How to test modules
+- [Implementation Plan](implementation_plan.md) - Module development roadmap
