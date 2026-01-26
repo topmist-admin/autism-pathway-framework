@@ -1,0 +1,58 @@
+name: Weekly Milestone
+description: Track a week's deliverables in the 90-day plan
+title: "[Week X] "
+labels: ["milestone", "v0.1"]
+body:
+  - type: input
+    id: week
+    attributes:
+      label: Week Number
+      description: Which week in the 90-day plan?
+      placeholder: "1"
+    validations:
+      required: true
+
+  - type: input
+    id: theme
+    attributes:
+      label: Week Theme
+      description: One-line summary of this week's focus
+      placeholder: "Define the v0.1 contract"
+    validations:
+      required: true
+
+  - type: textarea
+    id: deliverables
+    attributes:
+      label: Deliverables
+      description: List all deliverables for this week
+      placeholder: |
+        - [ ] Deliverable 1
+        - [ ] Deliverable 2
+        - [ ] Deliverable 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance Criteria
+      description: How do we know this week is "done"?
+      placeholder: |
+        - All checkboxes above are complete
+        - PR merged to main
+        - Tests pass
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: What must be complete before this week can start?
+      placeholder: "Week X must be complete"
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks / Blockers
+      description: Known risks or potential blockers
+      placeholder: "Demo data creation may take longer than expected"

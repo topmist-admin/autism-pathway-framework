@@ -1,0 +1,48 @@
+name: Task
+description: A specific task or deliverable
+title: ""
+labels: ["task"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Infrastructure
+        - Documentation
+        - Validation
+        - Release
+        - Outreach
+    validations:
+      required: true
+
+  - type: input
+    id: week
+    attributes:
+      label: Related Week
+      description: Which week in the 90-day plan?
+      placeholder: "Week 3"
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What needs to be done?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Definition of Done
+      description: How do we know this is complete?
+      placeholder: |
+        - [ ] Code written and tested
+        - [ ] Documentation updated
+        - [ ] PR reviewed and merged
+
+  - type: input
+    id: estimate
+    attributes:
+      label: Time Estimate
+      placeholder: "2-4 hours"
