@@ -1,0 +1,139 @@
+# Demo Pipeline Configuration
+# For v0.1 reproducibility release
+# Run with: python -m autism_pathway_framework --config configs/demo.yaml
+
+# =============================================================================
+# General Settings
+# =============================================================================
+
+pipeline:
+  name: "demo_run"
+  output_dir: "outputs/demo_run"
+  seed: 42  # Deterministic reproducibility
+  verbose: true
+
+# =============================================================================
+# Input Data
+# =============================================================================
+
+data:
+  vcf_path: "examples/demo_data/demo_variants.vcf"
+  phenotype_path: "examples/demo_data/demo_phenotypes.csv"
+  pathway_db: "examples/demo_data/demo_pathways.gmt"
+
+# =============================================================================
+# Variant Processing (Module 02)
+# =============================================================================
+
+variant_processing:
+  # Quality control filters
+  qc:
+    min_quality: 20
+    min_depth: 10
+    max_missing_rate: 0.1
+    maf_threshold: 0.01
+
+  # Gene burden calculation
+  burden:
+    weights:
+      lof: 1.0
+      missense_damaging: 0.5
+      missense_benign: 0.1
+      synonymous: 0.0
+    aggregation: "weighted_sum"
+
+# =============================================================================
+# Pathway Scoring (Module 07)
+# =============================================================================
+
+pathway_scoring:
+  aggregation_method: "weighted_sum"
+  normalization: "zscore"
+  min_genes_per_pathway: 3
+  max_genes_per_pathway: 500
+
+  # Network propagation
+  network_propagation:
+    enabled: true
+    method: "random_walk_restart"
+    restart_prob: 0.5
+    max_iterations: 100
+    convergence_threshold: 1e-6
+
+# =============================================================================
+# Clustering (Module 08)
+# =============================================================================
+
+clustering:
+  method: "gmm"
+  n_clusters: null  # Auto-select via BIC
+  n_clusters_range: [2, 8]
+
+  # GMM parameters
+  gmm:
+    covariance_type: "full"
+    n_init: 10
+    max_iter: 200
+
+  # Stability analysis
+  stability:
+    n_bootstrap: 100
+    stability_threshold: 0.8  # ARI threshold
+
+# =============================================================================
+# Validation Gates (Required for v0.1)
+# =============================================================================
+
+validation:
+  # Negative control 1: Label shuffle
+  label_shuffle:
+    enabled: true
+    n_permutations: 100
+    expected_ari_max: 0.1  # Should be near zero
+
+  # Negative control 2: Random gene sets
+  random_genes:
+    enabled: true
+    n_random_sets: 100
+    expected_enrichment: false
+
+  # Stability test
+  stability:
+    enabled: true
+    threshold: 0.8  # ARI ≥ 0.8
+
+  # Reproducibility
+  reproducibility:
+    enabled: true
+    check_hashes: true
+
+# =============================================================================
+# Output Settings
+# =============================================================================
+
+output:
+  # Main outputs
+  pathway_scores: true
+  subtype_assignments: true
+  validation_report: true
+  summary_figure: true
+
+  # Formats
+  formats:
+    tables: "csv"
+    report: ["json", "md"]
+    figures: "png"
+
+  # Disclaimer (required)
+  disclaimer: |
+    Research use only. Not medical advice.
+    All hypotheses require independent experimental and clinical validation.
+
+# =============================================================================
+# Logging
+# =============================================================================
+
+logging:
+  level: "INFO"
+  file: "outputs/demo_run/pipeline.log"
+  console: true

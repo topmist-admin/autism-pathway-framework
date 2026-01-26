@@ -1,0 +1,206 @@
+# Default Pipeline Configuration
+# Base configuration - override with specific configs (demo.yaml, production.yaml)
+
+# =============================================================================
+# General Settings
+# =============================================================================
+
+pipeline:
+  name: "default_run"
+  output_dir: "outputs/default_run"
+  seed: null  # Random if not specified
+  verbose: false
+
+# =============================================================================
+# Input Data
+# =============================================================================
+
+data:
+  vcf_path: null  # Required
+  phenotype_path: null  # Optional
+  pathway_db: null  # Uses built-in if not specified
+
+# =============================================================================
+# Variant Processing (Module 02)
+# =============================================================================
+
+variant_processing:
+  qc:
+    min_quality: 30
+    min_depth: 10
+    max_missing_rate: 0.05
+    maf_threshold: 0.01
+
+  burden:
+    weights:
+      lof: 1.0
+      missense_damaging: 0.5
+      missense_benign: 0.1
+      synonymous: 0.0
+    aggregation: "weighted_sum"
+
+# =============================================================================
+# Knowledge Graph (Module 03)
+# =============================================================================
+
+knowledge_graph:
+  sources:
+    - "reactome"
+    - "go_bp"
+    - "string_ppi"
+  min_confidence: 0.7
+  export_format: "dgl"
+
+# =============================================================================
+# Embeddings (Modules 04-05)
+# =============================================================================
+
+embeddings:
+  graph:
+    method: "rotate"
+    dim: 128
+    epochs: 100
+    margin: 6.0
+
+  pretrained:
+    geneformer:
+      enabled: false
+      model_path: null
+    esm2:
+      enabled: false
+      model_name: "esm2_t33_650M_UR50D"
+
+  fusion:
+    method: "concatenate"
+
+# =============================================================================
+# GNN (Module 06)
+# =============================================================================
+
+gnn:
+  enabled: false  # Disabled by default for v0.1
+  hidden_dim: 256
+  num_layers: 3
+  attention_heads: 4
+  dropout: 0.1
+
+# =============================================================================
+# Pathway Scoring (Module 07)
+# =============================================================================
+
+pathway_scoring:
+  aggregation_method: "weighted_sum"
+  normalization: "zscore"
+  min_genes_per_pathway: 5
+  max_genes_per_pathway: 500
+
+  network_propagation:
+    enabled: true
+    method: "random_walk_restart"
+    restart_prob: 0.5
+    max_iterations: 100
+    convergence_threshold: 1e-6
+
+# =============================================================================
+# Clustering (Module 08)
+# =============================================================================
+
+clustering:
+  method: "gmm"
+  n_clusters: null
+  n_clusters_range: [2, 10]
+
+  gmm:
+    covariance_type: "full"
+    n_init: 10
+    max_iter: 200
+
+  stability:
+    n_bootstrap: 100
+    stability_threshold: 0.8
+
+# =============================================================================
+# Symbolic Rules (Module 09)
+# =============================================================================
+
+symbolic_rules:
+  enabled: true
+  rules: ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
+  min_confidence: 0.5
+
+# =============================================================================
+# Neurosymbolic (Module 10)
+# =============================================================================
+
+neurosymbolic:
+  enabled: false  # Disabled by default for v0.1
+  combination_method: "weighted_sum"
+  neural_weight: 0.7
+  symbolic_weight: 0.3
+
+# =============================================================================
+# Therapeutic Hypotheses (Module 11)
+# =============================================================================
+
+therapeutic:
+  enabled: false  # Disabled by default for v0.1
+  drug_database: "drugbank"
+  max_hypotheses: 10
+
+# =============================================================================
+# Causal Inference (Module 12)
+# =============================================================================
+
+causal:
+  enabled: false  # Disabled by default for v0.1
+  method: "do_calculus"
+
+# =============================================================================
+# Validation
+# =============================================================================
+
+validation:
+  label_shuffle:
+    enabled: true
+    n_permutations: 100
+    expected_ari_max: 0.1
+
+  random_genes:
+    enabled: true
+    n_random_sets: 100
+
+  stability:
+    enabled: true
+    threshold: 0.8
+
+  reproducibility:
+    enabled: true
+    check_hashes: true
+
+# =============================================================================
+# Output
+# =============================================================================
+
+output:
+  pathway_scores: true
+  subtype_assignments: true
+  validation_report: true
+  summary_figure: true
+
+  formats:
+    tables: "csv"
+    report: ["json", "md"]
+    figures: "png"
+
+  disclaimer: |
+    Research use only. Not medical advice.
+    All hypotheses require independent experimental and clinical validation.
+
+# =============================================================================
+# Logging
+# =============================================================================
+
+logging:
+  level: "INFO"
+  file: null
+  console: true
