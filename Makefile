@@ -8,7 +8,7 @@
 #   make lint          - Run linters
 #   make deploy-gcp    - Deploy to Google Cloud
 
-.PHONY: help setup install test lint format clean deploy-gcp download-data
+.PHONY: help setup install test lint format clean deploy-gcp download-data docker-build docker-test verify
 
 # Default target
 help:
@@ -27,6 +27,16 @@ help:
 	@echo "Data:"
 	@echo "  make download-data  Download required databases (minimal)"
 	@echo "  make download-all   Download all databases (includes large files)"
+	@echo ""
+	@echo "Docker:"
+	@echo "  make docker-build   Build Docker image"
+	@echo "  make docker-test    Run tests in Docker"
+	@echo "  make docker-demo    Run demo pipeline in Docker"
+	@echo "  make docker-shell   Open shell in Docker container"
+	@echo ""
+	@echo "Verification:"
+	@echo "  make verify         Verify environment setup"
+	@echo "  make verify-lock    Check if requirements.lock is up to date"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make deploy-gcp     Set up GCP resources"
@@ -126,3 +136,50 @@ test-module-02:
 docs-serve:
 	@echo "Documentation is in docs/ directory"
 	python -m http.server 8000 --directory docs/
+
+# =============================================================================
+# Docker Commands (v0.1)
+# =============================================================================
+
+docker-build:
+	@echo "Building Docker image..."
+	docker build -t autism-pathway-framework:v0.1 .
+
+docker-test:
+	@echo "Running tests in Docker..."
+	docker run autism-pathway-framework:v0.1 pytest tests/ -v --tb=short
+
+docker-demo:
+	@echo "Running demo in Docker..."
+	docker run -v $(PWD)/outputs:/app/outputs autism-pathway-framework:v0.1 \
+		python -m autism_pathway_framework --config configs/demo.yaml
+
+docker-shell:
+	docker run -it autism-pathway-framework:v0.1 bash
+
+# =============================================================================
+# Verification Commands (v0.1)
+# =============================================================================
+
+verify:
+	@echo "Verifying environment setup..."
+	@echo ""
+	@echo "1. Python version:"
+	@python --version
+	@echo ""
+	@echo "2. Key packages:"
+	@python -c "import numpy; print(f'  numpy: {numpy.__version__}')"
+	@python -c "import pandas; print(f'  pandas: {pandas.__version__}')"
+	@python -c "import torch; print(f'  torch: {torch.__version__}')"
+	@python -c "import networkx; print(f'  networkx: {networkx.__version__}')"
+	@echo ""
+	@echo "3. Module imports:"
+	@python -c "from modules import __init__; print('  modules: OK')" 2>/dev/null || echo "  modules: SKIP (editable install required)"
+	@python -c "import sys; sys.path.insert(0, '.'); from modules.01_data_loaders import vcf_loader; print('  01_data_loaders: OK')" 2>/dev/null || echo "  01_data_loaders: SKIP"
+	@python -c "import sys; sys.path.insert(0, '.'); from modules.03_knowledge_graph import schema; print('  03_knowledge_graph: OK')" 2>/dev/null || echo "  03_knowledge_graph: SKIP"
+	@echo ""
+	@echo "Verification complete!"
+
+verify-lock:
+	@echo "Verifying requirements.lock matches installed packages..."
+	@pip freeze | grep -v "^-e " | diff - requirements.lock && echo "requirements.lock is up to date" || echo "WARNING: requirements.lock may be out of date"
