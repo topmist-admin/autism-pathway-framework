@@ -1,0 +1,19 @@
+# Gene Matrix Transposed (GMT) format for pathway analysis
+# Format: pathway_name<TAB>description<TAB>gene1<TAB>gene2<TAB>...
+# Synthetic pathways for demo purposes - aligned with planted subtypes
+# Source: Curated from SFARI Gene, Reactome, and KEGG for ASD-relevant pathways
+SYNAPTIC_TRANSMISSION	Synaptic transmission and neurotransmitter signaling	SHANK3	NRXN1	SYNGAP1	GRIN2B	ANK2
+CHROMATIN_REMODELING	Chromatin modification and transcriptional regulation	CHD8	ARID1B	ASH1L	KMT2A	ADNP	MECP2
+ION_CHANNEL_REGULATION	Voltage-gated ion channel activity and neuronal excitability	SCN2A	KCNQ2	CACNA1A	TSC1	TSC2
+SYNAPTIC_SCAFFOLDING	Postsynaptic density and scaffolding proteins	SHANK3	SYNGAP1	ANK2	NRXN1
+TRANSCRIPTION_REGULATION	Gene expression and transcription factor activity	FOXP1	CHD8	ADNP	MECP2	ARID1B
+MTOR_SIGNALING	mTOR pathway and cellular growth regulation	PTEN	TSC1	TSC2	DYRK1A
+NEURONAL_DEVELOPMENT	Neuronal differentiation and brain development	CHD8	FOXP1	ADNP	DYRK1A	NAA15
+GLUTAMATERGIC_SIGNALING	Glutamate receptor signaling and excitatory transmission	GRIN2B	SHANK3	SYNGAP1	NRXN1
+SODIUM_CHANNEL_COMPLEX	Voltage-gated sodium channel function	SCN2A	ANK2
+POTASSIUM_CHANNEL_COMPLEX	Voltage-gated potassium channel function	KCNQ2	CACNA1A
+HISTONE_MODIFICATION	Histone methylation and acetylation	KMT2A	ASH1L	CHD8	ARID1B
+PROTEIN_ACETYLATION	N-terminal protein acetylation	NAA15	ADNP
+ASD_HIGH_CONFIDENCE	SFARI Category 1 high-confidence ASD genes	CHD8	SCN2A	SHANK3	SYNGAP1	ADNP	ARID1B	ASH1L	DYRK1A	GRIN2B	PTEN
+ASD_SYNDROMIC	Syndromic ASD-associated genes	TSC1	TSC2	MECP2	PTEN	CACNA1A
+NEUREXIN_NEUROLIGIN	Cell adhesion and synaptic organization	NRXN1	SHANK3	ANK2

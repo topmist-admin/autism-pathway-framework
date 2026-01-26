@@ -85,8 +85,11 @@ data/
 *.parquet
 *.feather
 
-# But keep test fixtures
+# But keep test fixtures and demo data
 !tests/fixtures/
+!examples/demo_data/*.vcf
+!examples/demo_data/*.csv
+!examples/demo_data/*.gmt
 
 # =============================================================================
 # Models and Embeddings (large files)
