@@ -20,6 +20,7 @@ import pandas as pd
 import yaml
 
 from .utils.seed import set_global_seed, get_rng
+from .validation import ValidationGates, ValidationGatesResult, format_validation_report
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -97,6 +98,10 @@ class DemoPipeline:
         self.gene_burdens: Optional[pd.DataFrame] = None
         self.pathway_scores: Optional[pd.DataFrame] = None
         self.cluster_assignments: Optional[pd.DataFrame] = None
+        self.n_clusters: int = 0
+
+        # Validation results
+        self.validation_result: Optional[ValidationGatesResult] = None
 
         # Timing
         self.start_time: Optional[datetime] = None
@@ -346,6 +351,8 @@ class DemoPipeline:
         else:
             n_clusters = self.config.n_clusters
 
+        self.n_clusters = n_clusters
+
         # Fit final model
         gmm = GaussianMixture(
             n_components=n_clusters,
@@ -408,6 +415,34 @@ class DemoPipeline:
             cluster_labels[cluster_id] = label
 
         return cluster_labels
+
+    def run_validation_gates(self) -> None:
+        """Run validation gates to verify clustering quality."""
+        logger.info("Running validation gates...")
+
+        validator = ValidationGates(
+            seed=self.config.seed,
+            n_permutations=100,
+            n_bootstrap=50,
+            stability_threshold=0.8,
+            null_ari_max=0.15,
+        )
+
+        cluster_labels = self.cluster_assignments["cluster_id"].values
+
+        self.validation_result = validator.run_all(
+            pathway_scores=self.pathway_scores,
+            cluster_labels=cluster_labels,
+            pathways=self.pathways,
+            gene_burdens=self.gene_burdens,
+            n_clusters=self.n_clusters,
+            gmm_seed=self.config.seed,
+        )
+
+        # Log summary
+        status = "PASS" if self.validation_result.all_passed else "FAIL"
+        logger.info(f"Validation Gates: {status}")
+        logger.info(f"  {self.validation_result.summary}")
 
     def generate_outputs(self) -> None:
         """Generate all output artifacts."""
@@ -507,8 +542,8 @@ class DemoPipeline:
 
     def _generate_reports(self) -> None:
         """Generate JSON and Markdown reports."""
-        # Compute validation metrics
-        validation = {}
+        # Compute ground truth validation metrics (if planted subtypes available)
+        ground_truth_validation = {}
         if "planted_subtype" in self.cluster_assignments.columns:
             from sklearn.metrics import adjusted_rand_score
 
@@ -516,8 +551,13 @@ class DemoPipeline:
                 self.cluster_assignments["planted_subtype"],
                 self.cluster_assignments["cluster_label"],
             )
-            validation["adjusted_rand_index"] = round(ari, 4)
-            validation["ari_threshold_met"] = ari > 0.7
+            ground_truth_validation["adjusted_rand_index"] = round(ari, 4)
+            ground_truth_validation["ari_threshold_met"] = ari > 0.7
+
+        # Validation gates results
+        validation_gates = {}
+        if self.validation_result:
+            validation_gates = self.validation_result.to_dict()
 
         # JSON report
         report = {
@@ -537,7 +577,8 @@ class DemoPipeline:
                 "n_clusters": self.cluster_assignments["cluster_id"].nunique(),
             },
             "clusters": self.cluster_assignments["cluster_label"].value_counts().to_dict(),
-            "validation": validation,
+            "ground_truth_validation": ground_truth_validation,
+            "validation_gates": validation_gates,
             "disclaimer": self.config.disclaimer,
         }
 
@@ -584,11 +625,52 @@ class DemoPipeline:
         for cluster, count in report["clusters"].items():
             lines.append(f"| {cluster} | {count} |")
 
-        lines.extend(["", "## Validation", ""])
+        # Validation Gates section
+        validation_gates = report.get("validation_gates", {})
+        if validation_gates:
+            all_passed = validation_gates.get("all_passed", False)
+            summary = validation_gates.get("summary", "")
+            tests = validation_gates.get("tests", [])
 
-        if report["validation"]:
-            ari = report["validation"].get("adjusted_rand_index", "N/A")
-            threshold_met = report["validation"].get("ari_threshold_met", False)
+            status_str = "PASS" if all_passed else "FAIL"
+            lines.extend([
+                "",
+                "## Validation Gates",
+                "",
+                f"**Overall Status:** {status_str}",
+                "",
+                f"{summary}",
+                "",
+                "| Test | Status | Metric | Value | Threshold |",
+                "|------|--------|--------|-------|-----------|",
+            ])
+
+            for test in tests:
+                status_icon = "PASS" if test["status"] == "PASS" else "FAIL"
+                lines.append(
+                    f"| {test['name']} | {status_icon} | {test['metric']} | "
+                    f"{test['value']:.3f} | {test['comparison']} {test['threshold']} |"
+                )
+
+            lines.extend([
+                "",
+                "### Interpretation",
+                "",
+                "- **Negative Control 1 (Label Shuffle)**: Clustering should NOT recover "
+                "randomly shuffled labels. PASS means no spurious patterns.",
+                "- **Negative Control 2 (Random Gene Sets)**: Clusters should be driven by "
+                "biological pathways, not random genes. PASS means pathways matter.",
+                "- **Stability Test (Bootstrap)**: Clusters should be robust to resampling. "
+                "PASS means stable features.",
+            ])
+
+        # Ground truth validation (planted subtypes)
+        lines.extend(["", "## Ground Truth Validation", ""])
+
+        ground_truth = report.get("ground_truth_validation", {})
+        if ground_truth:
+            ari = ground_truth.get("adjusted_rand_index", "N/A")
+            threshold_met = ground_truth.get("ari_threshold_met", False)
             status = "PASS" if threshold_met else "FAIL"
             lines.extend(
                 [
@@ -683,6 +765,7 @@ class DemoPipeline:
             self.compute_gene_burdens()
             self.compute_pathway_scores()
             self.cluster_samples()
+            self.run_validation_gates()
             self.generate_outputs()
 
             self.end_time = datetime.now()
