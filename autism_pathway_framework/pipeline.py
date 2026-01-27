@@ -1,0 +1,698 @@
+"""
+Demo Pipeline Orchestrator
+
+Provides the main pipeline for running the autism pathway framework
+from data loading through subtype clustering and output generation.
+"""
+
+import hashlib
+import json
+import logging
+import os
+import sys
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+import pandas as pd
+import yaml
+
+from .utils.seed import set_global_seed, get_rng
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class PipelineConfig:
+    """Configuration for the demo pipeline."""
+
+    name: str = "demo_run"
+    output_dir: str = "outputs/demo_run"
+    seed: Optional[int] = 42
+    verbose: bool = True
+
+    # Input paths
+    vcf_path: str = ""
+    phenotype_path: str = ""
+    pathway_db: str = ""
+
+    # Clustering
+    n_clusters: Optional[int] = None
+    n_clusters_range: List[int] = field(default_factory=lambda: [2, 8])
+
+    # Output settings
+    disclaimer: str = "Research use only. Not medical advice."
+
+    @classmethod
+    def from_yaml(cls, yaml_path: str) -> "PipelineConfig":
+        """Load configuration from YAML file."""
+        with open(yaml_path, "r") as f:
+            config_dict = yaml.safe_load(f)
+
+        # Flatten nested config
+        pipeline = config_dict.get("pipeline", {})
+        data = config_dict.get("data", {})
+        clustering = config_dict.get("clustering", {})
+        output = config_dict.get("output", {})
+
+        return cls(
+            name=pipeline.get("name", "demo_run"),
+            output_dir=pipeline.get("output_dir", "outputs/demo_run"),
+            seed=pipeline.get("seed", 42),
+            verbose=pipeline.get("verbose", True),
+            vcf_path=data.get("vcf_path", ""),
+            phenotype_path=data.get("phenotype_path", ""),
+            pathway_db=data.get("pathway_db", ""),
+            n_clusters=clustering.get("n_clusters"),
+            n_clusters_range=clustering.get("n_clusters_range", [2, 8]),
+            disclaimer=output.get("disclaimer", "Research use only."),
+        )
+
+
+class DemoPipeline:
+    """
+    Main pipeline orchestrator for the autism pathway framework demo.
+
+    This provides a simplified end-to-end pipeline that:
+    1. Loads VCF, phenotype, and pathway data
+    2. Computes gene burden scores
+    3. Aggregates to pathway scores
+    4. Clusters samples into subtypes
+    5. Generates outputs (tables, figures, reports)
+    """
+
+    def __init__(self, config: PipelineConfig):
+        """Initialize the pipeline with configuration."""
+        self.config = config
+        self.output_dir = Path(config.output_dir)
+        self.rng = None
+
+        # Data holders
+        self.variants_df: Optional[pd.DataFrame] = None
+        self.phenotypes_df: Optional[pd.DataFrame] = None
+        self.pathways: Dict[str, List[str]] = {}
+        self.gene_burdens: Optional[pd.DataFrame] = None
+        self.pathway_scores: Optional[pd.DataFrame] = None
+        self.cluster_assignments: Optional[pd.DataFrame] = None
+
+        # Timing
+        self.start_time: Optional[datetime] = None
+        self.end_time: Optional[datetime] = None
+
+    def setup(self) -> None:
+        """Set up output directories and logging."""
+        # Create output directory
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        (self.output_dir / "figures").mkdir(exist_ok=True)
+
+        # Set up logging
+        log_file = self.output_dir / "pipeline.log"
+        logging.basicConfig(
+            level=logging.INFO if self.config.verbose else logging.WARNING,
+            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            handlers=[
+                logging.FileHandler(log_file),
+                logging.StreamHandler(sys.stdout),
+            ],
+        )
+
+        # Set seed for reproducibility
+        if self.config.seed is not None:
+            set_global_seed(self.config.seed)
+            self.rng = get_rng(self.config.seed, "pipeline")
+            logger.info(f"Set random seed: {self.config.seed}")
+
+        logger.info(f"Output directory: {self.output_dir}")
+
+    def load_data(self) -> None:
+        """Load VCF, phenotype, and pathway data."""
+        logger.info("Loading input data...")
+
+        # Load VCF (simplified - parse INFO fields)
+        self._load_vcf()
+
+        # Load phenotypes
+        self._load_phenotypes()
+
+        # Load pathways
+        self._load_pathways()
+
+        logger.info(
+            f"Loaded: {len(self.variants_df)} variants, "
+            f"{len(self.phenotypes_df)} samples, "
+            f"{len(self.pathways)} pathways"
+        )
+
+    def _load_vcf(self) -> None:
+        """Load and parse VCF file."""
+        vcf_path = Path(self.config.vcf_path)
+        if not vcf_path.exists():
+            raise FileNotFoundError(f"VCF file not found: {vcf_path}")
+
+        # Parse VCF manually (simplified for demo)
+        variants = []
+        samples = []
+        genotypes = []
+
+        with open(vcf_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("##"):
+                    continue
+                if line.startswith("#CHROM"):
+                    # Parse header
+                    parts = line.split("\t")
+                    samples = parts[9:]  # Sample columns start at index 9
+                    continue
+
+                parts = line.split("\t")
+                if len(parts) < 9:
+                    continue
+
+                # Parse variant info
+                chrom, pos, vid, ref, alt, qual, filt, info, fmt = parts[:9]
+
+                # Parse INFO field
+                info_dict = {}
+                for item in info.split(";"):
+                    if "=" in item:
+                        key, val = item.split("=", 1)
+                        info_dict[key] = val
+                    else:
+                        info_dict[item] = True
+
+                variants.append(
+                    {
+                        "chrom": chrom,
+                        "pos": int(pos),
+                        "id": vid,
+                        "ref": ref,
+                        "alt": alt,
+                        "qual": float(qual) if qual != "." else 0,
+                        "filter": filt,
+                        "gene": info_dict.get("GENE", ""),
+                        "consequence": info_dict.get("CONSEQUENCE", ""),
+                        "cadd": float(info_dict.get("CADD", 0)),
+                    }
+                )
+
+                # Parse genotypes
+                sample_gts = parts[9:]
+                gt_row = {}
+                for sample, gt_data in zip(samples, sample_gts):
+                    gt = gt_data.split(":")[0]
+                    # Convert GT to allele count: 0/0=0, 0/1=1, 1/1=2
+                    if gt in ("0/0", "0|0"):
+                        gt_row[sample] = 0
+                    elif gt in ("0/1", "1/0", "0|1", "1|0"):
+                        gt_row[sample] = 1
+                    elif gt in ("1/1", "1|1"):
+                        gt_row[sample] = 2
+                    else:
+                        gt_row[sample] = 0
+                genotypes.append(gt_row)
+
+        self.variants_df = pd.DataFrame(variants)
+        self.genotypes_df = pd.DataFrame(genotypes)
+        self.samples = samples
+
+    def _load_phenotypes(self) -> None:
+        """Load phenotype CSV file."""
+        pheno_path = Path(self.config.phenotype_path)
+        if not pheno_path.exists():
+            raise FileNotFoundError(f"Phenotype file not found: {pheno_path}")
+
+        self.phenotypes_df = pd.read_csv(pheno_path)
+        self.phenotypes_df.set_index("sample_id", inplace=True)
+
+    def _load_pathways(self) -> None:
+        """Load pathway GMT file."""
+        gmt_path = Path(self.config.pathway_db)
+        if not gmt_path.exists():
+            raise FileNotFoundError(f"Pathway file not found: {gmt_path}")
+
+        self.pathways = {}
+        with open(gmt_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                parts = line.split("\t")
+                if len(parts) >= 3:
+                    pathway_name = parts[0]
+                    # parts[1] is description, parts[2:] are genes
+                    genes = parts[2:]
+                    self.pathways[pathway_name] = genes
+
+    def compute_gene_burdens(self) -> None:
+        """Compute gene-level burden scores for each sample."""
+        logger.info("Computing gene burden scores...")
+
+        # Get unique genes
+        genes = self.variants_df["gene"].unique()
+
+        # Initialize burden matrix
+        burden_data = {}
+
+        for gene in genes:
+            if not gene:
+                continue
+
+            # Get variants in this gene
+            gene_variants = self.variants_df[self.variants_df["gene"] == gene]
+
+            for sample in self.samples:
+                # Sum weighted burden across variants
+                burden = 0.0
+                for idx, var in gene_variants.iterrows():
+                    gt = self.genotypes_df.loc[idx, sample]
+                    if gt > 0:
+                        # Weight by consequence and CADD
+                        weight = 1.0
+                        if "frameshift" in var["consequence"] or "stop" in var["consequence"]:
+                            weight = 1.0  # LoF
+                        elif "missense" in var["consequence"]:
+                            weight = 0.5 if var["cadd"] > 25 else 0.1
+                        else:
+                            weight = 0.1
+
+                        burden += gt * weight * (var["cadd"] / 40.0)  # Normalize CADD
+
+                if gene not in burden_data:
+                    burden_data[gene] = {}
+                burden_data[gene][sample] = burden
+
+        self.gene_burdens = pd.DataFrame(burden_data).fillna(0)
+        logger.info(f"Computed burdens for {len(burden_data)} genes")
+
+    def compute_pathway_scores(self) -> None:
+        """Aggregate gene burdens to pathway scores."""
+        logger.info("Computing pathway scores...")
+
+        pathway_scores = {}
+
+        for pathway_name, pathway_genes in self.pathways.items():
+            # Find genes in this pathway that we have burden data for
+            common_genes = [g for g in pathway_genes if g in self.gene_burdens.columns]
+
+            if len(common_genes) < 2:
+                continue
+
+            # Aggregate: mean burden across pathway genes
+            pathway_scores[pathway_name] = self.gene_burdens[common_genes].mean(axis=1)
+
+        self.pathway_scores = pd.DataFrame(pathway_scores)
+
+        # Z-score normalize
+        self.pathway_scores = (
+            self.pathway_scores - self.pathway_scores.mean()
+        ) / self.pathway_scores.std()
+        self.pathway_scores = self.pathway_scores.fillna(0)
+
+        logger.info(f"Computed scores for {len(pathway_scores)} pathways")
+
+    def cluster_samples(self) -> None:
+        """Cluster samples into subtypes using GMM."""
+        logger.info("Clustering samples into subtypes...")
+
+        from sklearn.mixture import GaussianMixture
+        from sklearn.metrics import silhouette_score
+
+        X = self.pathway_scores.values
+
+        # Determine optimal number of clusters using BIC
+        if self.config.n_clusters is None:
+            best_bic = np.inf
+            best_k = 2
+            for k in range(
+                self.config.n_clusters_range[0], self.config.n_clusters_range[1] + 1
+            ):
+                gmm = GaussianMixture(
+                    n_components=k,
+                    covariance_type="full",
+                    n_init=10,
+                    random_state=self.config.seed,
+                )
+                gmm.fit(X)
+                bic = gmm.bic(X)
+                if bic < best_bic:
+                    best_bic = bic
+                    best_k = k
+            n_clusters = best_k
+            logger.info(f"Selected {n_clusters} clusters via BIC")
+        else:
+            n_clusters = self.config.n_clusters
+
+        # Fit final model
+        gmm = GaussianMixture(
+            n_components=n_clusters,
+            covariance_type="full",
+            n_init=10,
+            random_state=self.config.seed,
+        )
+        gmm.fit(X)
+        labels = gmm.predict(X)
+        probs = gmm.predict_proba(X)
+
+        # Create cluster labels based on top pathways
+        cluster_labels = self._label_clusters(labels)
+
+        # Build assignments dataframe
+        self.cluster_assignments = pd.DataFrame(
+            {
+                "sample_id": self.pathway_scores.index,
+                "cluster_id": labels,
+                "cluster_label": [cluster_labels[l] for l in labels],
+                "confidence": probs.max(axis=1),
+            }
+        )
+
+        # Add planted subtype for validation if available
+        if "planted_subtype" in self.phenotypes_df.columns:
+            self.cluster_assignments["planted_subtype"] = self.cluster_assignments[
+                "sample_id"
+            ].map(self.phenotypes_df["planted_subtype"])
+
+        # Compute silhouette score
+        if n_clusters > 1:
+            sil_score = silhouette_score(X, labels)
+            logger.info(f"Silhouette score: {sil_score:.3f}")
+
+        logger.info(f"Assigned {len(labels)} samples to {n_clusters} clusters")
+
+    def _label_clusters(self, labels: np.ndarray) -> Dict[int, str]:
+        """Assign biological labels to clusters based on top pathways."""
+        cluster_labels = {}
+
+        for cluster_id in np.unique(labels):
+            # Get samples in this cluster
+            cluster_mask = labels == cluster_id
+            cluster_scores = self.pathway_scores.iloc[cluster_mask].mean()
+
+            # Get top pathway
+            top_pathway = cluster_scores.idxmax()
+
+            # Map to biological label
+            if "SYNAPTIC" in top_pathway or "GLUTAMAT" in top_pathway:
+                label = "synaptic"
+            elif "CHROMATIN" in top_pathway or "HISTONE" in top_pathway:
+                label = "chromatin"
+            elif "ION_CHANNEL" in top_pathway or "SODIUM" in top_pathway or "POTASSIUM" in top_pathway:
+                label = "ion_channel"
+            else:
+                label = f"subtype_{cluster_id}"
+
+            cluster_labels[cluster_id] = label
+
+        return cluster_labels
+
+    def generate_outputs(self) -> None:
+        """Generate all output artifacts."""
+        logger.info("Generating outputs...")
+
+        # 1. Pathway scores table
+        self._save_pathway_scores()
+
+        # 2. Cluster assignments
+        self._save_cluster_assignments()
+
+        # 3. Summary figure
+        self._generate_summary_figure()
+
+        # 4. Reports (JSON and Markdown)
+        self._generate_reports()
+
+        # 5. Run metadata
+        self._save_metadata()
+
+        logger.info(f"All outputs saved to: {self.output_dir}")
+
+    def _save_pathway_scores(self) -> None:
+        """Save pathway scores to CSV."""
+        output_path = self.output_dir / "pathway_scores.csv"
+        self.pathway_scores.to_csv(output_path)
+        logger.info(f"Saved pathway scores: {output_path}")
+
+    def _save_cluster_assignments(self) -> None:
+        """Save cluster assignments to CSV."""
+        output_path = self.output_dir / "subtype_assignments.csv"
+        self.cluster_assignments.to_csv(output_path, index=False)
+        logger.info(f"Saved cluster assignments: {output_path}")
+
+    def _generate_summary_figure(self) -> None:
+        """Generate summary visualization."""
+        try:
+            import matplotlib
+
+            matplotlib.use("Agg")  # Non-interactive backend
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            from sklearn.decomposition import PCA
+
+            fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+            # 1. PCA of samples colored by cluster
+            pca = PCA(n_components=2, random_state=self.config.seed)
+            X_pca = pca.fit_transform(self.pathway_scores.values)
+
+            scatter = axes[0].scatter(
+                X_pca[:, 0],
+                X_pca[:, 1],
+                c=self.cluster_assignments["cluster_id"],
+                cmap="Set2",
+                alpha=0.7,
+                s=50,
+            )
+            axes[0].set_xlabel(f"PC1 ({pca.explained_variance_ratio_[0]:.1%})")
+            axes[0].set_ylabel(f"PC2 ({pca.explained_variance_ratio_[1]:.1%})")
+            axes[0].set_title("Sample Clustering (PCA)")
+            plt.colorbar(scatter, ax=axes[0], label="Cluster")
+
+            # 2. Pathway scores heatmap (top pathways)
+            top_pathways = self.pathway_scores.var().nlargest(10).index
+            cluster_order = self.cluster_assignments.sort_values("cluster_id")["sample_id"]
+            heatmap_data = self.pathway_scores.loc[cluster_order, top_pathways]
+
+            sns.heatmap(
+                heatmap_data.T,
+                cmap="RdBu_r",
+                center=0,
+                ax=axes[1],
+                xticklabels=False,
+                yticklabels=True,
+            )
+            axes[1].set_title("Pathway Scores by Sample")
+            axes[1].set_xlabel("Samples (ordered by cluster)")
+
+            # 3. Cluster distribution
+            cluster_counts = self.cluster_assignments["cluster_label"].value_counts()
+            axes[2].bar(range(len(cluster_counts)), cluster_counts.values, color="steelblue")
+            axes[2].set_xticks(range(len(cluster_counts)))
+            axes[2].set_xticklabels(cluster_counts.index, rotation=45, ha="right")
+            axes[2].set_ylabel("Number of Samples")
+            axes[2].set_title("Cluster Distribution")
+
+            plt.tight_layout()
+            output_path = self.output_dir / "figures" / "summary.png"
+            plt.savefig(output_path, dpi=150, bbox_inches="tight")
+            plt.close()
+
+            logger.info(f"Saved summary figure: {output_path}")
+
+        except ImportError as e:
+            logger.warning(f"Could not generate figure (missing dependency): {e}")
+
+    def _generate_reports(self) -> None:
+        """Generate JSON and Markdown reports."""
+        # Compute validation metrics
+        validation = {}
+        if "planted_subtype" in self.cluster_assignments.columns:
+            from sklearn.metrics import adjusted_rand_score
+
+            ari = adjusted_rand_score(
+                self.cluster_assignments["planted_subtype"],
+                self.cluster_assignments["cluster_label"],
+            )
+            validation["adjusted_rand_index"] = round(ari, 4)
+            validation["ari_threshold_met"] = ari > 0.7
+
+        # JSON report
+        report = {
+            "pipeline_name": self.config.name,
+            "timestamp": datetime.now().isoformat(),
+            "seed": self.config.seed,
+            "input_files": {
+                "vcf": self.config.vcf_path,
+                "phenotypes": self.config.phenotype_path,
+                "pathways": self.config.pathway_db,
+            },
+            "summary": {
+                "n_variants": len(self.variants_df),
+                "n_samples": len(self.samples),
+                "n_genes": len(self.gene_burdens.columns) if self.gene_burdens is not None else 0,
+                "n_pathways": len(self.pathways),
+                "n_clusters": self.cluster_assignments["cluster_id"].nunique(),
+            },
+            "clusters": self.cluster_assignments["cluster_label"].value_counts().to_dict(),
+            "validation": validation,
+            "disclaimer": self.config.disclaimer,
+        }
+
+        json_path = self.output_dir / "report.json"
+        with open(json_path, "w") as f:
+            json.dump(report, f, indent=2)
+        logger.info(f"Saved JSON report: {json_path}")
+
+        # Markdown report
+        md_content = self._generate_markdown_report(report)
+        md_path = self.output_dir / "report.md"
+        with open(md_path, "w") as f:
+            f.write(md_content)
+        logger.info(f"Saved Markdown report: {md_path}")
+
+    def _generate_markdown_report(self, report: Dict[str, Any]) -> str:
+        """Generate human-readable Markdown report."""
+        lines = [
+            "# Autism Pathway Framework - Analysis Report",
+            "",
+            f"**Pipeline:** {report['pipeline_name']}",
+            f"**Date:** {report['timestamp']}",
+            f"**Seed:** {report['seed']}",
+            "",
+            "---",
+            "",
+            "## Input Summary",
+            "",
+            f"| Metric | Value |",
+            f"|--------|-------|",
+            f"| Variants | {report['summary']['n_variants']} |",
+            f"| Samples | {report['summary']['n_samples']} |",
+            f"| Genes | {report['summary']['n_genes']} |",
+            f"| Pathways | {report['summary']['n_pathways']} |",
+            "",
+            "## Clustering Results",
+            "",
+            f"**Number of clusters:** {report['summary']['n_clusters']}",
+            "",
+            "| Cluster | Samples |",
+            "|---------|---------|",
+        ]
+
+        for cluster, count in report["clusters"].items():
+            lines.append(f"| {cluster} | {count} |")
+
+        lines.extend(["", "## Validation", ""])
+
+        if report["validation"]:
+            ari = report["validation"].get("adjusted_rand_index", "N/A")
+            threshold_met = report["validation"].get("ari_threshold_met", False)
+            status = "PASS" if threshold_met else "FAIL"
+            lines.extend(
+                [
+                    f"| Metric | Value | Status |",
+                    f"|--------|-------|--------|",
+                    f"| Adjusted Rand Index | {ari} | {status} |",
+                    "",
+                    f"*Threshold: ARI > 0.7 for planted subtype recovery*",
+                ]
+            )
+        else:
+            lines.append("*No planted ground truth available for validation*")
+
+        lines.extend(
+            [
+                "",
+                "---",
+                "",
+                "## Disclaimer",
+                "",
+                report["disclaimer"],
+                "",
+                "---",
+                "",
+                "*Generated by Autism Pathway Framework v0.1*",
+            ]
+        )
+
+        return "\n".join(lines)
+
+    def _save_metadata(self) -> None:
+        """Save run metadata for reproducibility."""
+        # Compute file hashes
+        def file_hash(path: str) -> str:
+            if not Path(path).exists():
+                return "N/A"
+            with open(path, "rb") as f:
+                return hashlib.sha256(f.read()).hexdigest()[:16]
+
+        metadata = {
+            "run_id": f"{self.config.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            "config_file": "configs/demo.yaml",
+            "timestamp": datetime.now().isoformat(),
+            "git_commit": self._get_git_commit(),
+            "random_seed": self.config.seed,
+            "input_files": {
+                "vcf": self.config.vcf_path,
+                "vcf_hash": file_hash(self.config.vcf_path),
+                "phenotypes": self.config.phenotype_path,
+                "phenotypes_hash": file_hash(self.config.phenotype_path),
+                "pathways": self.config.pathway_db,
+                "pathways_hash": file_hash(self.config.pathway_db),
+            },
+            "runtime_seconds": (
+                (self.end_time - self.start_time).total_seconds()
+                if self.end_time and self.start_time
+                else None
+            ),
+        }
+
+        yaml_path = self.output_dir / "run_metadata.yaml"
+        with open(yaml_path, "w") as f:
+            yaml.dump(metadata, f, default_flow_style=False)
+        logger.info(f"Saved metadata: {yaml_path}")
+
+    def _get_git_commit(self) -> str:
+        """Get current git commit hash."""
+        try:
+            import subprocess
+
+            result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                capture_output=True,
+                text=True,
+                cwd=Path(__file__).parent.parent,
+            )
+            return result.stdout.strip() if result.returncode == 0 else "unknown"
+        except Exception:
+            return "unknown"
+
+    def run(self) -> None:
+        """Execute the full pipeline."""
+        self.start_time = datetime.now()
+
+        logger.info("=" * 60)
+        logger.info("Autism Pathway Framework - Demo Pipeline")
+        logger.info("=" * 60)
+
+        try:
+            self.setup()
+            self.load_data()
+            self.compute_gene_burdens()
+            self.compute_pathway_scores()
+            self.cluster_samples()
+            self.generate_outputs()
+
+            self.end_time = datetime.now()
+            runtime = (self.end_time - self.start_time).total_seconds()
+
+            logger.info("=" * 60)
+            logger.info(f"Pipeline completed successfully in {runtime:.1f} seconds")
+            logger.info(f"Outputs: {self.output_dir}")
+            logger.info("=" * 60)
+
+        except Exception as e:
+            logger.error(f"Pipeline failed: {e}")
+            raise
