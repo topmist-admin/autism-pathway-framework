@@ -164,3 +164,6 @@ gcloud-service-key.json
 *.pptx
 *.zip
 credentials/
+
+# Personal job application materials
+job-applications/
