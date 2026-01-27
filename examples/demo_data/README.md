@@ -1,5 +1,7 @@
 # Demo Data
 
+> **⚠️ RESEARCH USE ONLY** — This is synthetic data for demonstration purposes. All outputs are for research only. Not for clinical decision-making.
+
 This folder contains synthetic demonstration data for the Autism Pathway Framework.
 
 ## Purpose

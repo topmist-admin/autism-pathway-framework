@@ -1,5 +1,7 @@
 # Data Schema Documentation
 
+> **⚠️ RESEARCH USE ONLY** — All data and outputs are for research purposes only. Not for clinical decision-making. See [DISCLAIMER.md](../DISCLAIMER.md).
+
 This document describes the data flow through the Autism Pathway Framework: input formats, intermediate representations, and output artifacts.
 
 ## Overview

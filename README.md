@@ -1,5 +1,9 @@
 # Autism Pathway Framework
 
+> **⚠️ RESEARCH USE ONLY — NOT FOR CLINICAL DECISION-MAKING**
+>
+> This framework is for research and hypothesis generation purposes only. Outputs must NOT be used for clinical diagnosis, treatment decisions, or medical advice. All findings require independent experimental and clinical validation. See [DISCLAIMER.md](DISCLAIMER.md) and [docs/outputs_dictionary.md](docs/outputs_dictionary.md) for details.
+
 A comprehensive research framework for pathway- and network-based analysis of genetic heterogeneity in Autism Spectrum Disorder (ASD).
 
 > **Implementation Status**: FRAMEWORK COMPLETE - 12 modules + 3 integration pipelines | Last Updated: January 2026

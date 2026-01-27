@@ -1,5 +1,7 @@
 # Reproducibility Guide
 
+> **⚠️ RESEARCH USE ONLY** — This framework is for research purposes only. Not for clinical decision-making. See [DISCLAIMER.md](../DISCLAIMER.md).
+
 This document describes the deterministic seed strategy and reproducibility guarantees for the Autism Pathway Framework.
 
 ## Seed Strategy
