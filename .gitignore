@@ -170,3 +170,9 @@ job-applications/
 
 # Private outreach materials
 docs/outreach/
+
+# Release tarballs
+*.tar.gz
+
+# Substack content
+substack-content/
