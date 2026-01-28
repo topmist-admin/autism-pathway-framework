@@ -1,0 +1,47 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Autism Pathway Framework
+message: >-
+  If you use this software in your research, please cite it
+  using the metadata from this file.
+type: software
+authors:
+  - given-names: Rohit
+    family-names: Chauhan
+    orcid: ''
+repository-code: 'https://github.com/topmist-admin/autism-pathway-framework'
+url: 'https://github.com/topmist-admin/autism-pathway-framework'
+abstract: >-
+  A comprehensive research framework for pathway- and
+  network-based analysis of genetic heterogeneity in Autism
+  Spectrum Disorder (ASD). The framework shifts the unit of
+  analysis from individual genes to biological pathways,
+  enabling integration of genetic variation into pathway-level
+  disruption scores, network-based signal refinement, and
+  unsupervised learning to identify biologically coherent
+  subgroups.
+keywords:
+  - autism
+  - genetics
+  - pathway analysis
+  - bioinformatics
+  - machine learning
+  - computational biology
+  - ASD
+  - genetic heterogeneity
+license: MIT
+version: 0.1.0
+date-released: '2026-01-28'
+references:
+  - type: software
+    title: scikit-learn
+    authors:
+      - name: scikit-learn developers
+    url: 'https://scikit-learn.org'
+  - type: software
+    title: NetworkX
+    authors:
+      - name: NetworkX developers
+    url: 'https://networkx.org'
