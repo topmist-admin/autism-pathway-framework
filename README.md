@@ -328,12 +328,25 @@ See [DISCLAIMER.md](DISCLAIMER.md) for full details.
 
 ## Documentation
 
+### Getting Started
+
+- **[Quickstart Guide](docs/quickstart.md)** - Get running in 30 minutes
+- **[Start Here for Researchers](docs/start-here-researchers.md)** - Overview and golden path
+- [Architecture Diagram](docs/architecture-diagram.md) - Pipeline flow visualization
+
+### Reference
+
 - [Framework Overview](docs/framework_overview.md) - Conceptual architecture
-- [Implementation Plan](docs/implementation_plan.md) - Module development guide
 - [API Reference](docs/api_reference.md) - Detailed API documentation
+- [Outputs Dictionary](docs/outputs_dictionary.md) - How to interpret results
+- [Troubleshooting](docs/troubleshooting.md) - Common issues and solutions
+
+### Deep Dives
+
 - [Pathway Scoring Concept](docs/pathway_scoring_concept.md) - Scoring methodology
 - [Stability and Replication](docs/stability_replication.md) - Validation approaches
 - [Limitations](docs/limitations.md) - Known constraints and caveats
+- [Implementation Plan](docs/implementation_plan.md) - Module development guide
 
 ---
 
