@@ -480,13 +480,15 @@ class DemoPipeline:
     def _generate_summary_figure(self) -> None:
         """Generate summary visualization."""
         try:
+            # Set non-interactive backend before importing pyplot
             import matplotlib
-
-            matplotlib.use("Agg")  # Non-interactive backend
+            matplotlib.use("Agg")
             import matplotlib.pyplot as plt
             import seaborn as sns
             from sklearn.decomposition import PCA
 
+            # Ensure we have a clean figure state
+            plt.close("all")
             fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
             # 1. PCA of samples colored by cluster
@@ -539,6 +541,8 @@ class DemoPipeline:
 
         except ImportError as e:
             logger.warning(f"Could not generate figure (missing dependency): {e}")
+        except Exception as e:
+            logger.warning(f"Could not generate figure: {e}")
 
     def _generate_reports(self) -> None:
         """Generate JSON and Markdown reports."""

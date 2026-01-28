@@ -28,6 +28,8 @@ WORKDIR /app
 # =============================================================================
 # System Dependencies
 # =============================================================================
+# Note: libhts-dev depends on libcurl4-gnutls-dev, so we don't install libcurl4-openssl-dev
+# (they conflict with each other)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     gcc \
@@ -38,7 +40,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     libbz2-dev \
     liblzma-dev \
-    libcurl4-openssl-dev \
     libssl-dev \
     git \
     curl \

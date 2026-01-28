@@ -86,8 +86,10 @@ class ReproducibilityVerifier:
         self.log("\n[1/5] Checking required output files...")
 
         required = golden.get("required_outputs", [])
+        optional = golden.get("optional_outputs", [])
         all_exist = True
 
+        # Check required files (errors if missing)
         for filename in required:
             filepath = self.output_dir / filename
             if filepath.exists():
@@ -95,6 +97,14 @@ class ReproducibilityVerifier:
             else:
                 self.error(f"Missing: {filename}")
                 all_exist = False
+
+        # Check optional files (warnings if missing)
+        for filename in optional:
+            filepath = self.output_dir / filename
+            if filepath.exists():
+                self.passed_check(f"Found (optional): {filename}")
+            else:
+                self.warn(f"Missing (optional): {filename}")
 
         return all_exist
 
