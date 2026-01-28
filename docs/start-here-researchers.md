@@ -1,8 +1,12 @@
 # Start Here for Researchers
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/topmist-admin/autism-pathway-framework/blob/main/examples/notebooks/01_demo_end_to_end.ipynb)
+
 > **RESEARCH USE ONLY** — This framework is for hypothesis generation only. Not for clinical decision-making. All findings require independent experimental and clinical validation.
 
 Welcome to the Autism Pathway Framework. This guide will help you understand what the framework does, run the demo, and evaluate whether it's useful for your research.
+
+**Fastest way to try it:** Click the "Open in Colab" button above to run the demo interactively in your browser - no installation required.
 
 ---
 

@@ -1,12 +1,29 @@
 # Quickstart Guide
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/topmist-admin/autism-pathway-framework/blob/main/examples/notebooks/01_demo_end_to_end.ipynb)
+
 > **RESEARCH USE ONLY** — This framework is for research purposes only. Not for clinical decision-making. See [DISCLAIMER.md](../DISCLAIMER.md).
 
 Get the Autism Pathway Framework running in under 30 minutes.
 
 ---
 
-## Prerequisites
+## Option A: Try in Google Colab (No Installation)
+
+Click the "Open in Colab" button above to run the complete demo pipeline in your browser. The notebook:
+
+- Requires no local installation
+- Walks through each step interactively
+- Includes visualizations
+- Takes ~10 minutes to complete
+
+This is the fastest way to explore the framework.
+
+---
+
+## Option B: Local Installation
+
+### Prerequisites
 
 - **Python 3.10+** (3.11 recommended)
 - **Git**

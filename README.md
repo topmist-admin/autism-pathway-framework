@@ -1,5 +1,7 @@
 # Autism Pathway Framework
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/topmist-admin/autism-pathway-framework/blob/main/examples/notebooks/01_demo_end_to_end.ipynb)
+
 > **⚠️ RESEARCH USE ONLY — NOT FOR CLINICAL DECISION-MAKING**
 >
 > This framework is for research and hypothesis generation purposes only. Outputs must NOT be used for clinical diagnosis, treatment decisions, or medical advice. All findings require independent experimental and clinical validation. See [DISCLAIMER.md](DISCLAIMER.md) and [docs/outputs_dictionary.md](docs/outputs_dictionary.md) for details.
@@ -94,7 +96,8 @@ autism-pathway-framework/
 │   └── default.yaml          # Default settings
 │
 ├── examples/                 # Demo data and examples
-│   └── demo_data/            # Synthetic 50-sample dataset
+│   ├── demo_data/            # Synthetic 50-sample dataset
+│   └── notebooks/            # Jupyter notebooks (Colab-ready)
 │
 ├── outputs/                  # Pipeline outputs (gitignored)
 │
@@ -229,6 +232,14 @@ make test
 
 ## Quick Start
 
+### Try it in Google Colab (Fastest)
+
+No installation required - run the demo directly in your browser:
+
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/topmist-admin/autism-pathway-framework/blob/main/examples/notebooks/01_demo_end_to_end.ipynb)
+
+The notebook walks through the complete pipeline step-by-step with visualizations.
+
 ### Using Integration Pipelines (Recommended)
 
 ```python
@@ -330,6 +341,7 @@ See [DISCLAIMER.md](DISCLAIMER.md) for full details.
 
 ### Getting Started
 
+- **[Demo Notebook](examples/notebooks/01_demo_end_to_end.ipynb)** - Interactive walkthrough (Colab-ready)
 - **[Quickstart Guide](docs/quickstart.md)** - Get running in 30 minutes
 - **[Start Here for Researchers](docs/start-here-researchers.md)** - Overview and golden path
 - [Architecture Diagram](docs/architecture-diagram.md) - Pipeline flow visualization

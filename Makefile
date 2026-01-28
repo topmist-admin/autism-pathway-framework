@@ -8,7 +8,7 @@
 #   make lint          - Run linters
 #   make deploy-gcp    - Deploy to Google Cloud
 
-.PHONY: help setup install test lint format clean deploy-gcp download-data docker-build docker-test verify
+.PHONY: help setup install test lint format clean deploy-gcp download-data docker-build docker-test verify notebook
 
 # Default target
 help:
@@ -37,6 +37,10 @@ help:
 	@echo "Verification:"
 	@echo "  make verify         Verify environment setup"
 	@echo "  make verify-lock    Check if requirements.lock is up to date"
+	@echo ""
+	@echo "Notebooks:"
+	@echo "  make notebook       Open demo notebook in Jupyter"
+	@echo "  make notebook-lab   Open notebooks folder in JupyterLab"
 	@echo ""
 	@echo "Deployment:"
 	@echo "  make deploy-gcp     Set up GCP resources"
@@ -218,3 +222,15 @@ update-golden:
 	@echo "WARNING: Only do this if pipeline changes are intentional!"
 	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = "y" ]
 	python scripts/update_golden_outputs.py
+
+# =============================================================================
+# Notebook Commands (Week 9)
+# =============================================================================
+
+notebook:
+	@echo "Starting Jupyter notebook server..."
+	jupyter notebook examples/notebooks/01_demo_end_to_end.ipynb
+
+notebook-lab:
+	@echo "Starting JupyterLab..."
+	jupyter lab examples/notebooks/
