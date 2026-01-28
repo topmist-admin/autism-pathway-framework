@@ -42,6 +42,12 @@
             "relation": "isSupplementTo",
             "resource_type": "software",
             "scheme": "url"
+        },
+        {
+            "identifier": "10.13140/RG.2.2.25221.41441",
+            "relation": "isSupplementTo",
+            "resource_type": "publication-preprint",
+            "scheme": "doi"
         }
     ],
     "notes": "This software is intended for RESEARCH USE ONLY. It is not designed, intended, or validated for clinical diagnosis, screening, treatment, or any other medical purpose."
