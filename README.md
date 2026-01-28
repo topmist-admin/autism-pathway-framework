@@ -425,10 +425,45 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 ## Citation
 
-If you use this framework in your research, please cite appropriately and acknowledge its research-only nature.
+If you use this framework in your research, please cite:
+
+```bibtex
+@software{chauhan_2026_autism_pathway,
+  author       = {Chauhan, Rohit},
+  title        = {Autism Pathway Framework},
+  version      = {0.1.0},
+  year         = {2026},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.18403844},
+  url          = {https://doi.org/10.5281/zenodo.18403844}
+}
+```
+
+See [CITATION.cff](CITATION.cff) for additional formats.
+
+---
+
+## Support This Project
+
+If this framework is useful for your research, consider:
+
+- **Citing** the DOI in your publications
+- **Collaborating** on validation studies with your cohort data
+- **Contributing** code, documentation, or pathway definitions
+- **Sharing** with colleagues who work on ASD genetics
+
+### Collaboration Inquiries
+
+We're seeking collaborators with ASD cohort data (N ≥ 100) for validation studies. See [docs/outreach/run-on-your-cohort.md](docs/outreach/run-on-your-cohort.md) for details.
+
+### Funding
+
+This project is open source and unfunded. If you represent a funding organization interested in supporting this work, please get in touch.
 
 ---
 
 ## Contact
 
-For questions or collaboration inquiries, please open an issue in this repository.
+- **Email:** info@topmist.com
+- **GitHub Issues:** [Open an issue](https://github.com/topmist-admin/autism-pathway-framework/issues)
+- **Collaboration:** See [docs/outreach/](docs/outreach/) for collaboration materials
