@@ -1,6 +1,9 @@
 # Autism Pathway Framework
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/topmist-admin/autism-pathway-framework/blob/main/examples/notebooks/01_demo_end_to_end.ipynb)
+[![DOI](https://img.shields.io/badge/DOI-pending-lightgrey)](docs/zenodo_setup.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 
 > **⚠️ RESEARCH USE ONLY — NOT FOR CLINICAL DECISION-MAKING**
 >
