@@ -183,3 +183,38 @@ verify:
 verify-lock:
 	@echo "Verifying requirements.lock matches installed packages..."
 	@pip freeze | grep -v "^-e " | diff - requirements.lock && echo "requirements.lock is up to date" || echo "WARNING: requirements.lock may be out of date"
+
+# =============================================================================
+# Reproducibility Commands (Week 7)
+# =============================================================================
+
+demo:
+	@echo "Running demo pipeline..."
+	PYTHONHASHSEED=42 python -m autism_pathway_framework --config configs/demo.yaml
+
+verify-reproducibility:
+	@echo "Verifying reproducibility against golden outputs..."
+	python -m autism_pathway_framework.utils.verify_reproducibility \
+		--output-dir outputs/demo_run \
+		--golden tests/golden/expected_outputs.yaml
+
+reproducibility-test:
+	@echo "Running full reproducibility test (two runs + comparison)..."
+	@rm -rf outputs/demo_run outputs/run_1 outputs/run_2
+	@echo "Run 1..."
+	@PYTHONHASHSEED=42 python -m autism_pathway_framework --config configs/demo.yaml
+	@mv outputs/demo_run outputs/run_1
+	@echo "Run 2..."
+	@PYTHONHASHSEED=42 python -m autism_pathway_framework --config configs/demo.yaml
+	@mv outputs/demo_run outputs/run_2
+	@echo "Comparing..."
+	python -m autism_pathway_framework.utils.verify_reproducibility \
+		--output-dir outputs/run_2 \
+		--golden tests/golden/expected_outputs.yaml \
+		--compare outputs/run_1
+
+update-golden:
+	@echo "Updating golden outputs from current demo run..."
+	@echo "WARNING: Only do this if pipeline changes are intentional!"
+	@read -p "Continue? [y/N] " confirm && [ "$$confirm" = "y" ]
+	python scripts/update_golden_outputs.py

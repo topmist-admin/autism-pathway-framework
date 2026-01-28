@@ -83,25 +83,36 @@ autism-pathway-framework/
 │   ├── causal_analysis.py    # Standalone causal reasoning
 │   └── tests/                # Pipeline tests
 │
-├── docs/                     # Documentation
-│   ├── implementation_plan.md
-│   ├── framework_overview.md
-│   ├── api_reference.md
-│   ├── pathway_scoring_concept.md
-│   ├── stability_replication.md
-│   └── limitations.md
+├── autism_pathway_framework/ # CLI and utilities
+│   ├── cli.py                # Command-line interface
+│   ├── pipeline.py           # Demo pipeline orchestrator
+│   ├── validation.py         # Validation gates
+│   └── utils/                # Reproducibility utilities
 │
-├── pseudocode/               # Algorithm pseudocode
-│   ├── variant_to_gene.md
-│   ├── gene_to_pathway.md
-│   ├── network_refinement.md
-│   └── subtype_clustering.md
+├── configs/                  # Configuration files
+│   ├── demo.yaml             # Demo pipeline config
+│   └── default.yaml          # Default settings
+│
+├── examples/                 # Demo data and examples
+│   └── demo_data/            # Synthetic 50-sample dataset
+│
+├── outputs/                  # Pipeline outputs (gitignored)
 │
 ├── tests/                    # Test suites
-│   └── fixtures/             # Test data
+│   ├── fixtures/             # Test data
+│   └── golden/               # Golden outputs for reproducibility
 │
-└── examples/                 # Worked examples
-    └── synthetic_example.md
+├── docs/                     # Documentation
+│   ├── v0.1_scope.md         # Release scope
+│   ├── quickstart.md         # Getting started
+│   ├── troubleshooting.md    # Common issues + solutions
+│   ├── reproducibility.md    # Deterministic execution guide
+│   └── outputs_dictionary.md # Output interpretation
+│
+├── .github/                  # GitHub configuration
+│   └── workflows/ci.yml      # CI/CD pipeline
+│
+└── Makefile                  # Build and run commands
 ```
 
 ---
@@ -194,12 +205,25 @@ cd autism-pathway-framework
 python3 -m venv autismenv
 source autismenv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies (using locked versions for reproducibility)
+pip install -r requirements.lock
+pip install -e .
+
+# Or use make for convenience
+make setup
+
+# Verify environment
+make verify
 
 # Run tests
-python -m pytest modules/ -v
+make test
 ```
+
+### Requirements
+
+- Python 3.10+ (3.11 recommended)
+- 16 GB RAM recommended
+- 5 GB free disk space
 
 ---
 
@@ -313,18 +337,44 @@ See [DISCLAIMER.md](DISCLAIMER.md) for full details.
 
 ---
 
-## Testing
+## Testing & Reproducibility
 
 ```bash
 # Run all tests
-python -m pytest modules/ -v
+make test
 
 # Run specific module tests
 python -m pytest modules/12_causal_inference/tests/ -v
 
 # Run with coverage
-python -m pytest modules/ --cov=modules --cov-report=html
+make test-cov
 ```
+
+### Demo Pipeline
+
+Run the full demo pipeline on synthetic data:
+
+```bash
+# Run demo (produces outputs in outputs/demo_run/)
+make demo
+
+# Or directly
+python -m autism_pathway_framework --config configs/demo.yaml
+```
+
+### Reproducibility Verification
+
+Verify outputs match expected golden reference:
+
+```bash
+# Verify against golden outputs
+make verify-reproducibility
+
+# Full reproducibility test (runs pipeline twice, compares outputs)
+make reproducibility-test
+```
+
+See [docs/troubleshooting.md](docs/troubleshooting.md) for common issues.
 
 ---
 

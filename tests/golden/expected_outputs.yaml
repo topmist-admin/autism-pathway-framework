@@ -1,0 +1,101 @@
+# Golden Outputs Reference
+# Expected hashes and metrics for v0.1 demo pipeline reproducibility validation
+#
+# Generated with seed=42 on demo dataset
+# These values are used by CI to verify cross-machine reproducibility
+#
+# Usage:
+#   python -m autism_pathway_framework.utils.verify_reproducibility --golden tests/golden/expected_outputs.yaml
+#
+# IMPORTANT: Update these values if the pipeline logic changes intentionally.
+# Any unintended changes should be investigated as potential reproducibility issues.
+
+version: "0.1.0"
+generated_date: "2026-01-27"
+seed: 42
+
+# Input file hashes (should never change)
+input_files:
+  vcf:
+    path: "examples/demo_data/demo_variants.vcf"
+    sha256_prefix: "d889b11e7d753d97"
+  phenotypes:
+    path: "examples/demo_data/demo_phenotypes.csv"
+    sha256_prefix: "690e1fae2d5b9f25"
+  pathways:
+    path: "examples/demo_data/demo_pathways.gmt"
+    sha256_prefix: "6e228fef0e2a2d29"
+
+# Expected output metrics (deterministic with seed=42)
+expected_metrics:
+  # Data dimensions
+  n_samples: 50
+  n_variants: 20
+  n_genes: 18
+  n_pathways: 15  # Total pathways in database (7 have sufficient genes for scoring)
+
+  # Clustering results
+  n_clusters: 6
+  cluster_distribution:
+    synaptic: 16
+    subtype_5: 23
+    subtype_2: 3
+    subtype_3: 4
+    subtype_4: 4
+
+  # Pathway scores statistics (rounded for tolerance)
+  pathway_scores:
+    mean_range: [-0.5, 0.5]  # All means should be near 0 after z-score
+    std_range: [0.5, 2.0]    # Standard deviations
+    n_columns: 7
+    n_rows: 50
+
+# Validation gate thresholds and expected ranges
+validation_gates:
+  negative_control_1:
+    name: "Label Shuffle"
+    metric: "mean_null_ARI"
+    expected_range: [0.0, 0.15]  # Should be near zero
+    threshold: 0.15
+    comparison: "<"
+
+  negative_control_2:
+    name: "Random Gene Sets"
+    metric: "mean_random_ARI"
+    expected_range: [0.0, 0.20]  # May slightly exceed threshold on some runs
+    threshold: 0.15
+    comparison: "<"
+
+  stability_test:
+    name: "Bootstrap Stability"
+    metric: "mean_bootstrap_ARI"
+    expected_range: [0.6, 1.0]  # Should be reasonably stable
+    threshold: 0.8
+    comparison: ">="
+
+# Output file structure (must exist after successful run)
+required_outputs:
+  - "pathway_scores.csv"
+  - "subtype_assignments.csv"
+  - "report.json"
+  - "report.md"
+  - "run_metadata.yaml"
+  - "figures/summary.png"
+  - "pipeline.log"
+
+# Numeric tolerance for floating-point comparisons
+tolerances:
+  pathway_scores: 1e-10  # Should be exactly reproducible
+  ari_values: 0.05       # Validation metrics may have small variance
+
+# Notes on known platform differences
+platform_notes:
+  macos:
+    - "Primary development platform"
+    - "Exact reproducibility expected"
+  linux:
+    - "CI platform (GitHub Actions)"
+    - "Exact reproducibility expected"
+  windows_wsl2:
+    - "Tested via WSL2"
+    - "Minor floating-point differences possible due to different BLAS"
