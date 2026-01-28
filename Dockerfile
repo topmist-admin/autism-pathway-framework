@@ -65,11 +65,13 @@ RUN if [ -f requirements.lock ]; then \
 
 # Copy project files
 COPY pyproject.toml setup.py* ./
+COPY autism_pathway_framework/ ./autism_pathway_framework/
 COPY modules/ ./modules/
 COPY pipelines/ ./pipelines/
 COPY configs/ ./configs/
 COPY examples/ ./examples/
 COPY docs/ ./docs/
+COPY tests/ ./tests/
 
 # Install the package in editable mode
 RUN pip install -e .
